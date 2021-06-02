@@ -1,4 +1,5 @@
 resource.AddSingleFile("resource/localization/en/wire_stencil_core.properties")
+util.AddNetworkString("wire_stencil_core_entity")
 util.AddNetworkString("wire_stencil_core_init")
 util.AddNetworkString("wire_stencil_core_remove")
 util.AddNetworkString("wire_stencil_core_sync")

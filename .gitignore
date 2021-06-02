@@ -4,3 +4,7 @@
 *.tar.gz
 *.zip
 *.pdn
+lua/wire_stencil_core/old_script.lua
+lua/wire_stencil_core/old_script_cl.lua
+*.sublime-project
+*.sublime-workspace

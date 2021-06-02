@@ -27,22 +27,26 @@ local stencil_hooks = {
 	"PreDrawTranslucentRenderables"
 }
 
+local bits = include("wire_stencil_core/includes/bits.lua")
 local stencil_hooks_amount = #stencil_hooks
-local stencil_hooks_bits = math.ceil(math.log(stencil_hooks_amount, 2))
+local stencil_hooks_bits = bits(stencil_hooks_amount)
 local stencil_operations = include("wire_stencil_core/includes/operations.lua")
 local stencil_operations_amount = #stencil_operations
-local stencil_operations_bits = math.ceil(math.log(stencil_operations_amount, 2))
+local stencil_operations_bits = bits(stencil_operations_amount)
 local stencil_prefabs
+
+local queue_individual_sync
+local queue_removal_sync
 
 ----localized functions
 	local fl_math_ceil = math.ceil
 	local fl_math_log = math.log
 	local fl_math_max = math.max
-	local individual_sync
+	local request_individual_sync
+	local request_removal_sync
+	local is_owner = E2Lib.isOwner --first argument is a table with a player and entity key, where player is the owner and entity is the chip; second argu
 
 --local functions
-local function bits(number) return fl_math_max(fl_math_ceil(fl_math_log(number, 2)), 1) end
-
 local function bit_smart_write(value)
 	local value_bits = bits(value)
 	
@@ -61,57 +65,12 @@ local function create_stencil(context, stencil_index, stencil)
 	if stencil_count then stencil_counts[ply] = stencil_count + 1
 	else stencil_counts[ply] = 1 end
 	
-	individual_sync(context, stencil_index, stencil, true)
-end
-
-function individual_sync(context, stencil_index, stencil_update, full_sync, ply)
-	--stencil_update can be the whole stencil or just values that need to change
-	net.Start("wire_stencil_core_sync")
-	net.WriteUInt(context.entity:EntIndex(), 13) --8191
-	net.WriteUInt(stencil_index - 1, 16) --65536
-	net.WriteBool(full_sync)
-	
-	local index_amount = #stencil_update
-	local index_bits = bits(index_amount)
-	
-	--exposing bit_smart_write
-	net.WriteUInt(index_bits - 1, 5)
-	net.WriteUInt(index_amount - 1, index_bits)
-	
-	if full_sync then
-		net.WriteUInt(stencil_update.hook - 1, stencil_hooks_bits) --the numerical hook id
-		
-		for index, operation_data in ipairs(stencil_update) do
-			net.WriteUInt(operation_data[1] - 1, stencil_operations_bits) --the operation
-			bit_smart_write(operation_data[2])
-		end
-	else
-		local hook_changed = stencil_update.hook_changed or false
-		
-		if hook_changed then
-			net.WriteBool(true)
-			net.WriteUInt(stencil.hook - 1, stencil_hooks_bits) --the numerical hook id
-		else net.WriteBool(false) end
-		
-		for index, operation_data in pairs(stencil_update) do
-			if isnumber(index) then
-				net.WriteUInt(operation_index - 1, stencil_operations_bits) --the operation
-				net.WriteUInt(index - 1, index_bits) --the step or chonological placement of the operation
-				bit_smart_write(operation_data[2])
-			end
-		end
-	end
-	
-	if ply then net.Send(ply) else net.Broadcast() end
+	request_individual_sync(context, stencil_index, stencil, true)
 end
 
 local function initial_sync(ply)
 	--when syncing, we use unsigned integers to refer to hooks and operations as it is a lot less network intensive than strings
 	net.Start("wire_stencil_core_init")
-	
-	--sync stencil operation ids
-	net.WriteUInt(stencil_operations_bits - 1, 5)
-	net.WriteUInt(stencil_operations_amount - 1, stencil_operations_bits)
 	
 	for operation_id, operation in ipairs(stencil_operations) do net.WriteString(operation) end
 	
@@ -124,18 +83,6 @@ local function initial_sync(ply)
 	if ply then net.Send(ply) else net.Broadcast() end
 end
 
-local function removal_sync(chip_index, stencil_index)
-	net.Start("wire_stencil_core_remove")
-	net.WriteUInt(chip_index, 13) --8191
-	
-	if stencil_index then 
-		net.WriteBool(false)
-		net.WriteUInt(stencil_index - 1, 16)
-	else net.WriteBool(true) end
-	
-	net.Broadcast()
-end
-
 local function remove_stencil(context, stencil_index, no_sync)
 	local ply = context.player
 	local stencil = context.stencils[stencil_index]
@@ -146,8 +93,8 @@ local function remove_stencil(context, stencil_index, no_sync)
 		if stencil.entities then
 			for layer, entities in pairs(stencil.entities) do
 				for entity in pairs(entities) do
-					--do what ever was needed to all the entities
-					--probably remove a CallOnRemove
+					--anything more?
+					entity:RemoveCallOnRemove("wire_stencil_core")
 				end
 			end
 		end
@@ -156,14 +103,43 @@ local function remove_stencil(context, stencil_index, no_sync)
 		
 		if no_sync then return end
 		
-		removal_sync(context.entity:EntIndex(), stencil_index)
+		request_removal_sync(context, stencil_index)
 	end
 end
 
 local function remove_stencils(context)
 	for stencil_index, stencil in pairs(context.stencils) do remove_stencil(context, stencil_index, true) end
 	
-	removal_sync(context.entity:EntIndex())
+	request_removal_sync(context)
+end
+
+function request_individual_sync(context, stencil_index, stencil_update, full_sync)
+	local chip = context.entity
+	stencil_update.full_sync = full_sync or stencil_update.full_sync or nil
+	
+	if queue_individual_sync then
+		local chip_syncs = queue_individual_sync[chip]
+		 
+		if chip_syncs then
+			if full_sync then chip_syncs[stencil_index] = stencil_update
+			else table.Merge(chip_syncs[stencil_index], stencil_update) end
+		else queue_individual_sync[chip] = {[stencil_index] = stencil_update} end
+	else queue_individual_sync = {[chip] = {[stencil_index] = stencil_update}} end
+end
+
+function request_removal_sync(context, stencil_index)
+	local chip = context.entity
+	
+	if queue_removal_sync then
+		local chip_syncs = queue_removal_sync[chip]
+		
+		if chip_syncs == false then return end
+		
+		if stencil_index then
+			if chip_syncs then chip_syncs[stencil_index] = true
+			else queue_removal_sync[chip] = {[stencil_index] = true} end
+		else queue_removal_sync[chip] = false end
+	else queue_removal_sync = {}
 end
 
 --globals
@@ -215,6 +191,26 @@ stencil_prefabs = {
 		{"clear_obedient", color_black},
 		
 		{"draw_entities", 2}
+	},
+	
+	{
+		entities = {{}, {}},
+		name = "DIFFER",
+		hook = "PostDrawTranslucentRenderables",
+		
+		{"set_compare", STENCIL_EQUAL},
+		{"set_fail_operation", STENCIL_REPLACE},
+		{"set_pass_operation", STENCIL_KEEP},
+		{"set_reference_value", 1},
+		{"set_test_mask", 0xFF},
+		{"set_write_mask", 0xFF},
+		{"set_zfail_operation", STENCIL_KEEP},
+		
+		{"draw_entities", 1},
+		
+		{"set_compare", STENCIL_NOTEQUAL},
+		
+		{"draw_entities", 2}
 	}
 }
 
@@ -225,9 +221,6 @@ for operation_id, operation in ipairs(stencil_operations) do
 end
 
 for hook_id, hook_event in ipairs(stencil_hooks) do stencil_hooks[hook_event] = hook_id end
-
-print("stencil_prefabs before")
-PrintTable(stencil_prefabs, 1)
 
 for prefab_index, stencil_prefab in ipairs(stencil_prefabs) do
 	local hook_event = stencil_prefab.hook
@@ -248,24 +241,82 @@ for prefab_index, stencil_prefab in ipairs(stencil_prefabs) do
 	if isstring(hook_event) then stencil_prefab.hook = stencil_hooks[hook_event] end
 end
 
-print("stencil_prefabs after")
-PrintTable(stencil_prefabs, 1)
-
 --e2functions which are fancy pre-processors
-__e2setcost(3)
-e2function number stencilCreate(number index, number prefab_enumeration)
-	if index > 0 and index <= 65536 then
-		index = math.Round(index)
+__e2setcost(5)
+e2function number stencilAddEntity(number stencil_index, number entity_layer, entity entity)
+	if stencil_index > 0 and stencil_index <= 65536 and entity_layer > 0 and IsValid(entity) and is_owner(self, entity) then
+		entity_layer = math.Round(entity_layer)
+		stencil_index = math.Round(stencil_index)
+		stencil = self.stencils[stencil_index]
+		
+		if stencil and entity_layer <= #stencil.entities then
+			local entities = stencil.entities[entity_layer]
+			
+			if entities then
+				--don't actually add it again, but still return 1 to let them know it exists
+				if entities[entity] then return 1 end
+				
+				entities[entity] = true
+				
+				entity:CallOnRemove("wire_stencil_core", function(dying_entity)
+					entities[entity] = nil
+					
+					--sync function
+				end)
+				
+				--sync function
+				
+				return 1
+			end
+		end
+	end
+	
+	return 0
+end
+
+__e2setcost(10)
+e2function number stencilCreate(number stencil_index, number prefab_enumeration)
+	if stencil_index > 0 and stencil_index <= 65536 then
+		stencil_index = math.Round(stencil_index)
 		local prefab = stencil_prefabs[prefab_enumeration]
 		
 		if prefab then
 			local stencils = self.stencils
 			
-			if stencils[index] then remove_stencil(self, index) end
+			if stencils[stencil_index] then remove_stencil(self, stencil_index) end
 			
-			create_stencil(self, index, prefab)
+			create_stencil(self, stencil_index, prefab)
 			
 			return 1
+		end
+	end
+	
+	return 0
+end
+
+e2function number stencilRemove(number stencil_index)
+	
+end
+
+__e2setcost(5)
+e2function number stencilRemoveEntity(number stencil_index, number entity_layer, entity entity)
+	if stencil_index > 0 and stencil_index <= 65536 and entity_layer > 0 and IsValid(entity) and is_owner(self, entity) then
+		entity_layer = math.Round(entity_layer)
+		stencil_index = math.Round(stencil_index)
+		stencil = self.stencils[stencil_index]
+		
+		if stencil and entity_layer <= #stencil.entities then
+			local entities = stencil.entities[entity_layer]
+			
+			if entities and entities[entity] then
+				entities[entity] = nil
+				
+				entity:RemoveCallOnRemove("wire_stencil_core")
+				
+				--sync function
+				
+				return 1
+			end
 		end
 	end
 	
@@ -392,3 +443,108 @@ registerCallback("destruct", function(self) remove_stencils(self) end)
 
 --hooks
 hook.Add("PlayerDisconnected", "wire_stencil_core_extension", function(ply) stencil_counts[ply] = nil end)
+
+hook.Add("Think", "wire_stencil_core_extension", function()
+	--todo: cap the amount of syncs to do in one net message
+	--note: net.BytesWritten(), two returns
+	--maybe send multiple net messages, capping the amount that can be sent in a single tick too
+	
+	--todo: better bool stacking
+	--let them know when we are syncing stencils from another chip instead of sending the chip index every time
+	if queue_individual_sync then
+		local passed = false
+		
+		net.Start("wire_stencil_core_sync")
+		
+		for chip, stencil_updates in pairs(queue_individual_sync) do
+			for stencil_index, stencil_update in pairs(stencil_updates) do
+				local filter = stencil_update.sync_filter
+				local full_sync = stencil_update.full_sync
+				stencil_update.full_sync = nil
+				stencil_update.sync_filter = nil
+				
+				if passed then net.WriteBool(true)
+				else passed = true end
+				
+				do --sync function
+					--stencil_update can be the whole stencil or just values that need to change
+					net.WriteUInt(chip:EntIndex(), 13) --8191
+					net.WriteUInt(stencil_index - 1, 16) --65536
+					net.WriteBool(full_sync)
+					
+					local index_amount = #stencil_update
+					local index_bits = bits(index_amount)
+					
+					--exposing bit_smart_write
+					net.WriteUInt(index_bits - 1, 5)
+					net.WriteUInt(index_amount - 1, index_bits)
+					
+					if full_sync then
+						net.WriteUInt(stencil_update.hook - 1, stencil_hooks_bits) --the numerical hook id
+						
+						for index, operation_data in ipairs(stencil_update) do
+							net.WriteUInt(operation_data[1] - 1, stencil_operations_bits) --the operation
+							bit_smart_write(operation_data[2])
+						end
+					else
+						local hook_changed = stencil_update.hook_changed or false
+						
+						if hook_changed then
+							net.WriteBool(true)
+							net.WriteUInt(stencil.hook - 1, stencil_hooks_bits) --the numerical hook id
+						else net.WriteBool(false) end
+						
+						for index, operation_data in pairs(stencil_update) do
+							if isnumber(index) then
+								net.WriteUInt(operation_index - 1, stencil_operations_bits) --the operation
+								net.WriteUInt(index - 1, index_bits) --the step or chonological placement of the operation
+								bit_smart_write(operation_data[2])
+							end
+						end
+					end
+				end
+				
+				--goodber jojo
+				queue_individual_sync[chip][stencil_index] = nil
+			end
+			
+			queue_individual_sync[chip][stencil_index] = nil
+		end
+		
+		net.Broadcast()
+		
+		if table.IsEmpty(queue_individual_sync) then queue_individual_sync = nil end
+	end
+	
+	if queue_removal_sync then
+		local passed_chip = false
+		
+		net.Start("wire_stencil_core_remove")
+		
+		for chip, stencils in pairs(queue_removal_sync) do
+			if passed_chip then net.WriteBool(true)
+			else passed_chip = true end
+			
+			net.WriteUInt(chip:EntIndex(), 13) --8191
+			
+			--remove all from this chip
+			if stencils == false then net.WriteBool(true)
+			else
+				local passed_stencil = false
+				
+				net.WriteBool(false)
+				
+				for stencil_index in pairs(stencils) do
+					if passed_stencil then net.WriteBool(true)
+					else passed_stencil = true end
+					
+					net.WriteUInt(stencil_index - 1, 16)
+				end
+				
+				net.WriteBool(false)
+			end
+		end
+		
+		net.Broadcast()
+	end
+end)

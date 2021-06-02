@@ -1,7 +1,10 @@
 --I am a faithful believer of DRY (Don't Repeat Yourself!)
 --that's why we create a prefix system
 local function_descriptions = {
+	["stencilAddEntity"] =	0,
 	["stencilCreate"] =	0,
+	["stencilRemove"] =	0,
+	["stencilRemoveEntity"] =	0,
 }
 
 --1: YES.

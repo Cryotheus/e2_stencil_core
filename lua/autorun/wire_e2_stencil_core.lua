@@ -5,6 +5,7 @@ WIRE_STENCIL_CORE = {Backup = {}}
 local config = {
 	wire_stencil_core = {
 		includes = {
+			bits = 4,
 			digital_color = 4,
 			operations = 4,
 			translate = 4

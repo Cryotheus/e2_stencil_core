@@ -6,8 +6,8 @@ local stencil_hooks_amount = backup_data.stencil_hooks_amount
 local stencil_hooks_bits = backup_data.stencil_hooks_bits
 local stencil_operation_clear_obedient_id = backup_data.stencil_operation_clear_obedient_id
 local stencil_operations = include("wire_stencil_core/includes/operations.lua")
-local stencil_operations_amount = backup_data.stencil_operations_amount
-local stencil_operations_bits = backup_data.stencil_operations_bits
+local stencil_operations_amount = table.Count(stencil_operations)
+local stencil_operations_bits = bits(stencil_operations_amount)
 local stencil_operations_solver = backup_data.stencil_operations_solver or {}
 local stencil_repository = backup_data.stencil_repository or {}
 backup_data = nil
@@ -157,10 +157,21 @@ end)
 
 hook.Remove("PostDrawTranslucentRenderables", "wire_stencil_core")
 
+net.Receive("wire_stencil_core_entity", function()
+	repeat
+		local chip_index = net.ReadUInt(13)
+		
+		if net.ReadBool() then
+			
+		else
+			repeat
+				
+			until not net.ReadBool()
+		end
+	until not net.ReadBool()
+end)
+
 net.Receive("wire_stencil_core_init", function()
-	stencil_operations_bits = net.ReadUInt(5) + 1
-	stencil_operations_amount = net.ReadUInt(stencil_operations_bits) + 1
-	
 	for index = 1, stencil_operations_amount do
 		local operation = net.ReadString()
 		
@@ -195,83 +206,84 @@ net.Receive("wire_stencil_core_init", function()
 		stencil_hooks_bits = stencil_hooks_bits,
 		stencil_operation_clear_obedient_id = stencil_operation_clear_obedient_id,
 		stencil_operations = stencil_operations,
-		stencil_operations_amount = stencil_operations_amount,
-		stencil_operations_bits = stencil_operations_bits,
 		stencil_operations_solver = stencil_operations_solver,
 		stencil_repository = stencil_repository
 	}
 end)
 
 net.Receive("wire_stencil_core_remove", function()
-	local chip_index = net.ReadUInt(13) --8191
-	local remove_all = net.ReadBool()
-	
-	print("got a wire_stencil_core_remove with chip_index " .. tostring(chip_index) .. " and a remove_all of " .. tostring(remove_all))
-	
-	if remove_all then remove_stencil(chip_index)
-	else
-		local stencil_index = net.ReadUInt(16) + 1 --65536
+	repeat
+		local chip_index = net.ReadUInt(13)
 		
-		remove_stencil(chip_index, stencil_index)
-	end
+		if net.ReadBool() then remove_stencil(chip_index)
+		else
+			repeat
+				local stencil_index = net.ReadUInt(16) + 1
+				
+				remove_stencil(chip_index, stencil_index)
+			until not net.ReadBool()
+		end
+	until not net.ReadBool()
 end)
 
 net.Receive("wire_stencil_core_sync", function()
-	local chip_index = net.ReadUInt(13) --8191
-	local stencil_index = net.ReadUInt(16) + 1 --65536
-	local full_sync = net.ReadBool()
-	local index_bits = net.ReadUInt(5) + 1
-	local operation_count = net.ReadUInt(index_bits) + 1
-	
-	if full_sync then
-		local hook_event = stencil_hooks[net.ReadUInt(stencil_hooks_bits) + 1]
-		local old_hook_event = stencil_hooks[chip_index]
-		local repository = stencil_repository[hook_event]
-		local stencil = {hook = hook_event}
+	repeat
+		local chip_index = net.ReadUInt(13) --8191
+		local stencil_index = net.ReadUInt(16) + 1 --65536
+		local full_sync = net.ReadBool()
+		local index_bits = net.ReadUInt(5) + 1
+		local operation_count = net.ReadUInt(index_bits) + 1
 		
-		print("full sync with the hook " .. hook_event .. " and the old hook " .. tostring(old_hook_event))
-		print("our repository is " .. tostring(repository))
-		
-		--if there was an old hook, remove it
-		if old_hook_event then remove_hook_tracker(chip_index, stencil_index) end
-		
-		--slap the operations into the stencil table
-		for index = 1, operation_count do
-			local operation_index = net.ReadUInt(stencil_operations_bits) + 1
+		if full_sync then
+			local hook_event = stencil_hooks[net.ReadUInt(stencil_hooks_bits) + 1]
+			local old_hook_event = stencil_hooks[chip_index]
+			local repository = stencil_repository[hook_event]
+			local stencil = {hook = hook_event}
 			
-			print("got operation_index of " .. operation_index)
+			print("full sync with the hook " .. hook_event .. " and the old hook " .. tostring(old_hook_event))
+			print("our repository is " .. tostring(repository))
 			
-			--specific case for the clear_obedient operation where we have to convert it to a color; this will probably be made modular in the future
-			if operation_index == stencil_operation_clear_obedient_id then stencil[index] = {stencil_operations[operation_index], Color(decode_digital_color(bit_smart_read()))}
-			else stencil[index] = {stencil_operations[operation_index], bit_smart_read()} end
+			--if there was an old hook, remove it
+			if old_hook_event then remove_hook_tracker(chip_index, stencil_index) end
+			
+			--slap the operations into the stencil table
+			for index = 1, operation_count do
+				local operation_index = net.ReadUInt(stencil_operations_bits) + 1
+				
+				print("got operation_index of " .. operation_index)
+				
+				--specific case for the clear_obedient operation where we have to convert it to a color; this will probably be made modular in the future
+				if operation_index == stencil_operation_clear_obedient_id then stencil[index] = {stencil_operations[operation_index], Color(decode_digital_color(bit_smart_read()))}
+				else stencil[index] = {stencil_operations[operation_index], bit_smart_read()} end
+			end
+			
+			--finaly create the stencil table in the repository
+			if repository[chip_index] then repository[chip_index][stencil_index] = stencil
+			else repository[chip_index] = {[stencil_index] = stencil} end
+		else
+			local hook_changed = net.ReadBool()
+			local hook_event
+			local old_hook_event = stencil_hooks[chip_index][stencil_index]
+			
+			--move the stencil around as needed if the hook changes
+			if hook_changed then
+				hook_event = stencil_hooks[net.ReadUInt(stencil_hooks_bits) + 1]
+				
+				transfer_hook_tracker(chip_index, stencil_index, hook_event)
+			else hook_event = old_hook_event end
+			
+			local repository = stencil_repository[hook_event]
+			local stencil = repository[chip_index][stencil_index]
+			
+			--update the changed steps
+			for index = 1, operation_count do
+				local operation_index = net.ReadUInt(stencil_operations_bits) + 1
+				local step = net.ReadUInt(index_bits) + 1
+				
+				--specific case for the clear_obedient operation where we have to convert it to a color; this will probably be made modular in the future
+				if operation_index == stencil_operation_clear_obedient_id then stencil[step] = {stencil_operations[operation_index], Color(decode_digital_color(bit_smart_read()))}
+				else stencil[step] = {stencil_operations[operation_index], bit_smart_read()} end
+			end
 		end
-		
-		--finaly create the stencil table in the repository
-		if repository[chip_index] then repository[chip_index][stencil_index] = stencil
-		else repository[chip_index] = {[stencil_index] = stencil} end
-	else
-		local hook_changed = net.ReadBool()
-		local hook_event
-		local old_hook_event = stencil_hooks[chip_index][stencil_index]
-		
-		--move the stencil around as needed if the hook changes
-		if hook_changed then
-			hook_event = stencil_hooks[net.ReadUInt(stencil_hooks_bits) + 1]
-			
-			transfer_hook_tracker(chip_index, stencil_index, hook_event)
-		else hook_event = old_hook_event end
-		
-		local repository = stencil_repository[hook_event]
-		local stencil = repository[chip_index][stencil_index]
-		
-		--update the changed steps
-		for index = 1, operation_count do
-			local operation_index = net.ReadUInt(stencil_operations_bits) + 1
-			local step = net.ReadUInt(index_bits) + 1
-			
-			--specific case for the clear_obedient operation where we have to convert it to a color; this will probably be made modular in the future
-			if operation_index == stencil_operation_clear_obedient_id then stencil[step] = {stencil_operations[operation_index], Color(decode_digital_color(bit_smart_read()))}
-			else stencil[step] = {stencil_operations[operation_index], bit_smart_read()} end
-		end
-	end
+	until not net.ReadBool()
 end)
