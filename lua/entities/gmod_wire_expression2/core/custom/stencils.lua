@@ -139,7 +139,7 @@ function request_removal_sync(context, stencil_index)
 			if chip_syncs then chip_syncs[stencil_index] = true
 			else queue_removal_sync[chip] = {[stencil_index] = true} end
 		else queue_removal_sync[chip] = false end
-	else queue_removal_sync = {}
+	else queue_removal_sync = {} end
 end
 
 --globals

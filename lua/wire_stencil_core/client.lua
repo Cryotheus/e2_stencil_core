@@ -1,4 +1,5 @@
 local backup_data = WIRE_STENCIL_CORE.Backup --for autoreload
+local bits = include("wire_stencil_core/includes/bits.lua")
 local encode_digital_color, decode_digital_color = include("wire_stencil_core/includes/digital_color.lua")
 local local_player = LocalPlayer() --for reload, it won't actually return a valid player until InitPostEntity runs
 local stencil_hooks = backup_data.stencil_hooks or {}
