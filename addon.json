@@ -1,0 +1,19 @@
+{
+	"author"	:	"Cryotheum",
+	"title"		:	"[E2] Stencil Core 2",
+	"type"		:	"tool",
+	"tags"		:	[ "scenic" ],
+	"ignore"	:
+	[
+		"*.bat",
+		"*.gma",
+		"*.pdn",
+		"*.txt",
+		"*.zip",
+		".git*",
+		"license",
+		"LICENSE",
+		"*.md",
+		"wiki/*"
+	]
+}

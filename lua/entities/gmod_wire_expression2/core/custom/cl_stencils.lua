@@ -1,47 +1,20 @@
---I am a faithful believer of DRY (Don't Repeat Yourself!)
---that's why we create a prefix system
-local function_descriptions = {
-	["stencilAddEntity"] =	0,
-	["stencilCreate"] =	0,
-	["stencilRemove"] =	0,
-	["stencilRemoveEntity"] =	0,
-}
+--locals
+local descriptions = E2Helper.Descriptions
 
---1: YES.
-
-local prefixes = {[0] = ""}
-local translate = include("wire_stencil_core/includes/translate.lua")
-local wip_tag = translate("wire_stencil_core.e2helper.wip.tag")
-
---cache them so we don't have to translate them for every entry
-for index = 1, 1 do prefixes[index] = translate("wire_stencil_core.e2helper." .. index) end
-
---negative if they are wip
---bool if they have a special WIP message
-for name, data in pairs(function_descriptions) do
-	local method
-	local parsed = string.Replace(name, ":", ".")
-	local wip
-	local wip_prefix
-	
-	if istable(data) then
-		method = math.abs(data[1])
-		wip = data[1] < 0
-		wip_prefix = data[2]
-	else
-		method = math.abs(data)
-		wip = data < 0
-	end
-	
-	E2Helper.Descriptions[name] = translate(wip and "wire_stencil_core.e2helper.wip" or "wire_stencil_core.e2helper", {
-		description = translate("wire_stencil_core.e2." .. parsed),
-		prefix = prefixes[method],
-		wip = wip_prefix and translate("wire_stencil_core.e2helper.wip.prefixed", {
-			text = translate("wire_stencil_core.e2_wip." .. parsed),
-			wip = wip_tag
-		}) or wip and wip_tag or nil
-	})
-end
-
---clean up! probably don't need to do this, lua's gc is smart
-function_descriptions = nil
+--LOCALIZE: E2 helper descriptions!
+descriptions["stencilAddEntity(nne)"] = "Adds an entity to the stencil's specified layer; the first layer is 1. most stencils have 2 layers and show their effects when the two overlap."
+descriptions["stencilCompile(n)"] = "On the next tick, the stencil is sent to clients which will compile the stencil's instructions for rendering. This is required for custom stencils. Don't call this, as it's used for custom stencils which are not yet implemented."
+--descriptions["stencilCreate(n)"] = "Creates a stencil with the given index and without any instructions. The stencil will not be usable until stencilCompile is called."
+descriptions["stencilCreate(nn)"] = "Creates a stencil with the given index and prefab. Automatically calls stencilCompile."
+descriptions["stencilDelete(n)"] = "Deletes the stencil."
+descriptions["stencilEnable(nn)"] = "If enable is set to 0, stops networking the stencil and removes if from all clients. Setting this to 1 will do the opposite."
+descriptions["stencilHook(nn)"] = "Sets the stencil's render hook give a STENCILHOOK constant. Must be done before the stencil is compiled."
+descriptions["stencilPurge"] = "Deletes all of the chip's stencils."
+descriptions["stencilRemoveEntity(ne)"] = "Removes the entity from all of the stencil's layers."
+descriptions["stencilRemoveEntity(nne)"] = "Removes the entity from the stencil's specified layer."
+--descriptions["stencilSetInstructions(nr)"] = "Sets the stencil's instructions. This must be done before stencilCompile." --POST: custom stencils!
+--descriptions["stencilParameter(n...)"] = "Sets the stencil's parameters. This is not available on most prefabs."
+--descriptions["stencilParameter(nn...)"] = "Sets the stencil's parameter starting from the given index. This is not available on most prefabs."
+--descriptions["stencilVisible(nen)"] = "Sets the stencil's visibility for the specified player. 0 will hide it, anything else will show it." --POST: visibility!
+--descriptions["stencilVisible(nn)"] = "Sets the stencil's visibility. 0 will hide it, anything else will show it."
+--descriptions["stencilVisible(nrn)"] = "Sets the stencil's visibility for all players in the array. 0 will hide it, anything else will show it."

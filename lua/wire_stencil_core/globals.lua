@@ -1,1 +1,0 @@
-WIRE_STENCIL_CORE = {Backup = {}}

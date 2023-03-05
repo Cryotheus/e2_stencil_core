@@ -1,1 +1,0 @@
-include("wire_stencil_core/loader.lua")

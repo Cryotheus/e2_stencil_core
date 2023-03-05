@@ -1,10 +1,15 @@
-# batch and exports
+# Executables
+*.exe
+*.out
+*.app
+*.i*86
+*.x86_64
+*.hex
+
+# Development and compilation files
 *.bat
+*.expanded.lua
 *.gma
+*.pdn
 *.tar.gz
 *.zip
-*.pdn
-lua/wire_stencil_core/old_script.lua
-lua/wire_stencil_core/old_script_cl.lua
-*.sublime-project
-*.sublime-workspace
