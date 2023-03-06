@@ -27,6 +27,7 @@ function STENCIL_CORE:StencilCreate(chip_context, index, nil_instructions)
 	
 	local stencil = {
 		Chip = chip,
+		ChipIndex = chip:EntIndex(),
 		Enabled = false,
 		EntityCount = 0,
 		EntityLayers = {},

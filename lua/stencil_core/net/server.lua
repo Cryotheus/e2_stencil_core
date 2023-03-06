@@ -55,6 +55,7 @@ function STENCIL_CORE:NetQueueStencil(stencil, method, deletion)
 		--a discounted stencil for the sole purpose of deleting the client-side copy
 		table.insert(queue, {
 			Chip = chip,
+			ChipIndex = stencil.ChipIndex,
 			Delete = true,
 			Index = index,
 		})
