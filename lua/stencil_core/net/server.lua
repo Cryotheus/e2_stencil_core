@@ -123,7 +123,7 @@ end
 function STENCIL_CORE:NetWriteEntityLayer(layer)
 	net.WriteUInt(#layer, bits_layer_entities)
 	
-	for index, entity in ipairs(layer) do entity_proxy.Write(entity) end
+	for index, entity in ipairs(layer) do entity_proxy.Write(entity:EntIndex()) end
 end
 
 function STENCIL_CORE:NetWriteInstructions(stencil) end --POST: implement me!
@@ -141,7 +141,7 @@ end
 
 function STENCIL_CORE:NetWriteStencilIdentifier(stencil)
 	net.WriteUInt(stencil.Index, bits_maximum_stencil_index)
-	entity_proxy.Write(stencil.Chip)
+	entity_proxy.Write(stencil.ChipIndex)
 end
 
 function STENCIL_CORE:NetWriteStencils(queue, broadcast)

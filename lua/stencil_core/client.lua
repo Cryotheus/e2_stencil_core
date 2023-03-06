@@ -62,7 +62,8 @@ function STENCIL_CORE:StencilCreate(chip, index, chip_index)
 	}
 	
 	if not chip_stencils then
-		stencils[chip] = {[index] = stencil}
+		chip_stencils = {[index] = stencil}
+		stencils[chip] = chip_stencils
 		
 		chip:CallOnRemove("StencilCore", function()
 			timer.Simple(0, function()
