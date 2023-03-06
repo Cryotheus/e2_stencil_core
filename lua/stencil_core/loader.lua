@@ -1,7 +1,6 @@
 --https://github.com/Cryotheus/cryotheums_loader
 local config = {
 	{
-		debug = "shared", --TODO: remove me!
 		loader = "download",
 		global = "shared",
 	},

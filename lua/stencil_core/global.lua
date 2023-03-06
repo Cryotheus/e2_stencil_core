@@ -229,7 +229,6 @@ STENCIL_CORE = STENCIL_CORE or {
 	LoadedPlayers = {},
 	LoadingPlayers = {},
 	MaximumEntityCount = 8191 - game.MaxPlayers(),
-	NetEntityWatch = {},
 	NetStencilEntitiesQueue = {},
 	NetStencilQueue = {},
 	Operations = operations,

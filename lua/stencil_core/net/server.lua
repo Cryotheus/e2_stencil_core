@@ -126,8 +126,8 @@ function STENCIL_CORE:NetWriteEntityLayer(layer)
 	for index, entity in ipairs(layer) do entity_proxy.Write(entity) end
 end
 
-function STENCIL_CORE:NetWriteInstructions(stencil) end --TODO: implement me!
-function STENCIL_CORE:NetWriteParameters(parameters) end --TODO: implement me!
+function STENCIL_CORE:NetWriteInstructions(stencil) end --POST: implement me!
+function STENCIL_CORE:NetWriteParameters(parameters) end --POST: implement me!
 
 function STENCIL_CORE:NetWriteStencilData(stencil)
 	net.WriteEntity(stencil.Owner)
@@ -136,7 +136,7 @@ function STENCIL_CORE:NetWriteStencilData(stencil)
 	net.WriteBool(stencil.Prefab and true or false)
 	
 	if stencil.Prefab then net.WriteUInt(stencil.Prefab - 1, bits_prefabs)
-	else error("unimplemented") end --TODO: implement me!
+	else error("unimplemented") end --POST: implement me!
 end
 
 function STENCIL_CORE:NetWriteStencilIdentifier(stencil)

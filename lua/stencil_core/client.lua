@@ -21,17 +21,6 @@ function STENCIL_CORE:OverrideEntityRender(entity)
 	entity.RenderOverrideX_StencilCore = old_render_override
 end
 
-function STENCIL_CORE:RestoreEntityRender(entity)
-	if entity.RenderOverride == render_override then
-		--friend asked about this line when I was streaming in a discord call
-		--so in case you don't know, the following is equivalent to:
-		--entity.RenderOverride = entity.RenderOverrideX_StencilCore
-		--entity.RenderOverrideX_StencilCore = nil
-		--but done in a single line
-		entity.RenderOverride, entity.RenderOverrideX_StencilCore = entity.RenderOverrideX_StencilCore
-	end
-end
-
 function STENCIL_CORE:QueueHookUpdate()
 	if self.HookUpdateQueued then return end
 	
@@ -45,7 +34,19 @@ function STENCIL_CORE:QueueHookUpdate()
 	end)
 end
 
+function STENCIL_CORE:RestoreEntityRender(entity)
+	if entity.RenderOverride == render_override then
+		--friend asked about this line when I was streaming in a discord call
+		--so in case you don't know, the following is equivalent to:
+		--entity.RenderOverride = entity.RenderOverrideX_StencilCore
+		--entity.RenderOverrideX_StencilCore = nil
+		--but done in a single line
+		entity.RenderOverride, entity.RenderOverrideX_StencilCore = entity.RenderOverrideX_StencilCore
+	end
+end
+
 function STENCIL_CORE:StencilCreate(chip, index, chip_index)
+	print("StencilCreate", chip, index)
 	local chip_index = chip_index or chip:EntIndex()
 	local chip_stencils = stencils[chip]
 	local stencil = {
@@ -67,9 +68,10 @@ function STENCIL_CORE:StencilCreate(chip, index, chip_index)
 			timer.Simple(0, function()
 				if chip:IsValid() then return end
 				
+				--POST: optimize me!
+				for index, stencil in pairs(chip_stencils) do self:StencilDelete(chip, index) end
+				
 				stencils[chip] = nil
-			
-				self:NetUnwatchEntityCreation(chip_index)
 			end)
 		end)
 	else chip_stencils[index] = stencil end
@@ -78,6 +80,7 @@ function STENCIL_CORE:StencilCreate(chip, index, chip_index)
 end
 
 function STENCIL_CORE:StencilDelete(chip, index)
+	print("StencilDelete", chip, index)
 	local chip_stencils = stencils[chip]
 	
 	if chip_stencils then
