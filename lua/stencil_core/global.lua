@@ -3,6 +3,12 @@ local hook_aliases = {}
 local hook_functions = {}
 local parameterized_operations = {}
 
+local draw_strict = [[render.OverrideAlphaWriteEnable(true, false)
+	render.OverrideColorWriteEnable(true, false)
+	draw_entities($)
+	render.OverrideAlphaWriteEnable(false)
+	render.OverrideColorWriteEnable(false)]]
+
 --enumerations missing on server side
 STENCIL_NEVER = 1
 STENCIL_LESS = 2
@@ -32,8 +38,9 @@ local hooks = {
 
 local operations = {
 	{"clear_stencil", "render.ClearStencil()"},
-	{"clear", "render.ClearBuffersObeyStencil($.r, $.g, $.b)"},
+	{"clear", "render.ClearBuffersObeyStencil($.r, $.g, $.b, $.a)"},
 	{"draw", "draw_entities($)"},
+	{"draw_strict", draw_strict},
 	{"enabled", "render.SetStencilEnable($)"},
 	{"run", "render.PerformFullScreenStencilOperation()"},
 	{"set_compare", "render.SetStencilCompareFunction($)"},
@@ -238,4 +245,5 @@ STENCIL_CORE = STENCIL_CORE or {
 	Version = "0.1.0",
 }
 
+--POST: remove this debug
 STENCIL_CORE.Prefabs = prefabs
