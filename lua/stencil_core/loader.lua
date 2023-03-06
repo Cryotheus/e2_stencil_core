@@ -1,12 +1,13 @@
 --https://github.com/Cryotheus/cryotheums_loader
 local config = {
 	{
+		debug = "shared", --TODO: remove me!
 		loader = "download",
 		global = "shared",
 	},
 	
 	{
-		duplex = "shared",
+		duplex = "server",
 		
 		convar = {
 			client = true,

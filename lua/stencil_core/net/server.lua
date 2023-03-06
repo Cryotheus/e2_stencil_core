@@ -1,3 +1,4 @@
+include("includes/entity_proxy.lua")
 util.AddNetworkString("stencil_core")
 
 --locals
@@ -37,8 +38,6 @@ function STENCIL_CORE:NetQueueStencil(stencil, method, deletion)
 	local identifier = "StencilCoreNet" .. method
 	local index = stencil.Index
 	local queue = method == 1 and self.NetStencilQueue or self.NetStencilEntitiesQueue
-	
-	print(stencil, method, deletion)
 	
 	if deletion then --delete stencil on client
 		for index = #queue, 1, -1 do
@@ -105,11 +104,11 @@ function STENCIL_CORE:NetThink(queue, method, recipient)
 	--tell the client there is no more to read
 	net.WriteBool(false)
 	
-	if recipient then net.Send(recipient) print("just to", method, recipient)
+	if recipient then net.Send(recipient)
 	else --send to players who 
 		recipient = RecipientFilter()
 		
-		for index, ply in ipairs(player.GetHumans()) do print("it", method, ply) if loaded_players[ply] then recipient:AddPlayer(ply) print("added", ply) end end
+		for index, ply in ipairs(player.GetHumans()) do if loaded_players[ply] then recipient:AddPlayer(ply) end end
 		
 		net.Send(recipient)
 	end
@@ -124,7 +123,7 @@ end
 function STENCIL_CORE:NetWriteEntityLayer(layer)
 	net.WriteUInt(#layer, bits_layer_entities)
 	
-	for index, entity in ipairs(layer) do net.WriteEntity(entity) end
+	for index, entity in ipairs(layer) do entity_proxy.Write(entity) end
 end
 
 function STENCIL_CORE:NetWriteInstructions(stencil) end --TODO: implement me!
@@ -142,7 +141,7 @@ end
 
 function STENCIL_CORE:NetWriteStencilIdentifier(stencil)
 	net.WriteUInt(stencil.Index, bits_maximum_stencil_index)
-	net.WriteEntity(stencil.Chip)
+	entity_proxy.Write(stencil.Chip)
 end
 
 function STENCIL_CORE:NetWriteStencils(queue, broadcast)
@@ -176,10 +175,6 @@ end
 function STENCIL_CORE:NetWriteStencilsEntities(queue)
 	local completed = 0
 	local passed = false
-	
-	print("NetWriteStencilsEntities")
-	print(queue)
-	PrintTable(queue)
 	
 	for index, stencil in ipairs(queue) do
 		if net.BytesWritten() > maximum_net_size then break end

@@ -10,6 +10,8 @@
 *.bat
 *.expanded.lua
 *.gma
+*.new.lua
+*.old.lua
 *.pdn
 *.tar.gz
 *.zip

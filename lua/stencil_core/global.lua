@@ -49,14 +49,23 @@ local prefabs = {
 	--fail prefabs
 	{
 		"fail", {}, {
-			{"set_compare", STENCIL_EQUAL},
+			{"set_compare", STENCIL_ALWAYS},
+			{"set_pass_operation", STENCIL_REPLACE},
+			
+			{"draw", 2},
+			
+			{"set_compare", STENCIL_NOTEQUAL},
+			
+			{"draw", 1},
+			
+			--[[{"set_compare", STENCIL_EQUAL},
 			{"set_fail_operation", STENCIL_REPLACE},
 			
 			{"draw", 1},
 			
 			{"set_compare", STENCIL_NOTEQUAL},
 			
-			{"draw", 2},
+			{"draw", 2},]]
 			
 			--[[{"set_compare", STENCIL_EQUAL},
 			{"set_pass_operation", STENCIL_KEEP},
@@ -79,8 +88,6 @@ local prefabs = {
 			{"set_occluded_operation", STENCIL_REPLACE},
 			{"set_pass_operation", STENCIL_KEEP},
 			{"set_reference_value", 1},
-			{"set_test_mask", 255},
-			{"set_write_mask", 255},
 			
 			{"draw", 1},
 			
@@ -222,6 +229,7 @@ STENCIL_CORE = STENCIL_CORE or {
 	LoadedPlayers = {},
 	LoadingPlayers = {},
 	MaximumEntityCount = 8191 - game.MaxPlayers(),
+	NetEntityWatch = {},
 	NetStencilEntitiesQueue = {},
 	NetStencilQueue = {},
 	Operations = operations,
@@ -230,3 +238,5 @@ STENCIL_CORE = STENCIL_CORE or {
 	Stencils = {},
 	Version = "0.1.0",
 }
+
+STENCIL_CORE.Prefabs = prefabs

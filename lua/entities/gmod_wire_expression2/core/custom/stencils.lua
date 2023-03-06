@@ -31,6 +31,27 @@ local stencil_globals = {
 }
 
 --local functions
+local function authorized(context, entity)
+	if entity:IsPlayer() then
+		local ply = context.player
+		
+		return entity == ply or E2Lib.isFriend(entity, ply)
+	end
+	
+	--global alias of E2Lib.isOwner
+	return isOwner(context, entity)
+end
+
+local function get_hologram(context, index)
+	local holograms = context.data.holos
+	
+	if holograms then
+		local hologram = holograms[math.floor(index)]
+		
+		return hologram and hologram.ent
+	end
+end
+
 local function valid_in_range(number, minimum, maximum) return number == number and number <= maximum and number >= minimum and math.floor(number) end
 local function valid_stencil_index(number) return number == number and number <= convar_maximum_stencil_index and number >= 0 and math.floor(number) end
 
@@ -46,9 +67,21 @@ e2function void stencilAddEntity(number stencil_index, number layer_index, entit
 	if stencil_index and layer_index then
 		local stencil = stencil_repo[self.entity][stencil_index]
 		
-		if not stencil then return end
+		--we only need to do isOwner for this one function out of all that exist for this core
+		--you should always be able to remove entities from your stencils anyways
+		if stencil and entity:IsValid() and authorized(self, entity) then STENCIL_CORE:StencilAddEntity(self, entity, stencil, layer_index) end
+	end
+end
+
+e2function void stencilAddEntity(number stencil_index, number layer_index, number hologram_index)
+	local stencil_index = valid_stencil_index(stencil_index)
+	local layer_index = valid_in_range(layer_index, 1, convar_layers)
+	
+	if stencil_index and layer_index then
+		local hologram = get_hologram(self, hologram_index)
+		local stencil = stencil_repo[self.entity][stencil_index]
 		
-		STENCIL_CORE:StencilAddEntity(self, entity, stencil, layer_index)
+		if stencil and hologram then STENCIL_CORE:StencilAddEntity(self, hologram, stencil, layer_index) end
 	end
 end
 
@@ -89,9 +122,7 @@ e2function void stencilRemoveEntity(number stencil_index, entity entity)
 	if stencil_index then
 		local stencil = stencil_repo[self.entity][stencil_index]
 		
-		if not stencil then return end
-		
-		STENCIL_CORE:StencilRemoveEntity(self, entity, stencil)
+		if stencil and entity:IsValid() then STENCIL_CORE:StencilRemoveEntity(self, entity, stencil) end
 	end
 end
 
@@ -102,9 +133,30 @@ e2function void stencilRemoveEntity(number stencil_index, number layer_index, en
 	if stencil_index and layer_index then
 		local stencil = stencil_repo[self.entity][stencil_index]
 		
-		if not stencil then return end
+		if stencil and entity:IsValid() then STENCIL_CORE:StencilRemoveEntity(self, entity, stencil, layer_index) end
+	end
+end
+
+e2function void stencilRemoveEntity(number stencil_index, number hologram_index)
+	local stencil_index = valid_stencil_index(stencil_index)
+	
+	if stencil_index then
+		local hologram = get_hologram(self, hologram_index)
+		local stencil = stencil_repo[self.entity][stencil_index]
 		
-		STENCIL_CORE:StencilRemoveEntity(self, entity, stencil, layer_index)
+		if stencil and IsValid(hologram) then STENCIL_CORE:StencilRemoveEntity(self, hologram, stencil) end
+	end
+end
+
+e2function void stencilRemoveEntity(number stencil_index, number layer_index, number hologram_index)
+	local stencil_index = valid_stencil_index(stencil_index)
+	local layer_index = valid_in_range(layer_index, 1, convar_layers)
+	
+	if stencil_index and layer_index then
+		local hologram = get_hologram(self, hologram_index)
+		local stencil = stencil_repo[self.entity][stencil_index]
+		
+		if stencil and IsValid(hologram) then STENCIL_CORE:StencilRemoveEntity(self, hologram, stencil, layer_index) end
 	end
 end
 
