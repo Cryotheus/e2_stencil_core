@@ -14,17 +14,15 @@ StencilCoreTypicalRender = true
 
 --stencil core functions
 function STENCIL_CORE:OverrideEntityRender(entity)
-	if entity:IsEntityProxyAlive() then
-		if entity.RenderOverride == render_override then return end
-		
-		local old_render_override = entity.RenderOverrideX_StencilCore or entity.RenderOverride
-		entity.RenderOverride = render_override
-		entity.RenderOverrideX_StencilCore = old_render_override
-	end
+	if entity.RenderOverride == render_override then return end
+	
+	local old_render_override = entity.RenderOverrideX_StencilCore or entity.RenderOverride
+	entity.RenderOverride = render_override
+	entity.RenderOverrideX_StencilCore = old_render_override
 end
 
 function STENCIL_CORE:RestoreEntityRender(entity)
-	if entity:IsEntityProxyAlive() and entity.RenderOverride == render_override then
+	if entity.RenderOverride == render_override then
 		--friend asked about this line when I was streaming in a discord call
 		--so in case you don't know, the following is equivalent to:
 		--entity.RenderOverride = entity.RenderOverrideX_StencilCore
@@ -48,7 +46,7 @@ function STENCIL_CORE:QueueHookUpdate()
 end
 
 function STENCIL_CORE:StencilCreate(chip, index, chip_index)
-	local chip_index = chip_index or chip:IsEntityProxyAlive() and chip:EntIndex()
+	local chip_index = chip_index or chip:EntIndex()
 	local chip_stencils = stencils[chip]
 	local stencil = {
 		Chip = chip,
