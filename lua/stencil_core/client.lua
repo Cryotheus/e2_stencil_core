@@ -69,9 +69,6 @@ function STENCIL_CORE:StencilCreate(chip, index, chip_index)
 			timer.Simple(0, function()
 				if chip:IsValid() then return end
 				
-				--POST: optimize me!
-				for index, stencil in pairs(chip_stencils) do self:StencilDelete(chip, index) end
-				
 				stencils[chip] = nil
 			end)
 		end)
