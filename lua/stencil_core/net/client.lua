@@ -77,21 +77,10 @@ function STENCIL_CORE:NetReadParameters() return {} end --TODO: implement me!
 function STENCIL_CORE:NetReadStencilIdentifier()
 	local stencils = self.Stencils
 	local index = net.ReadUInt(bits_maximum_stencil_index)
-	local chip, chip_index = read_entity(
-		function(proxy, entity)
-			local chip_stencils = stencils[proxy]
-			
-			if not chip_stencils then return end
-			
-			stencils[entity] = chip_stencils
-			stencils[proxy] = nil
-			
-			--change the chip proxy into a real entity
-			for index, stencil in pairs(chip_stencils) do stencil.Chip = entity end
-		end)
+	local chip = entity_proxy.Read()
 	local chip_stencils = self.Stencils[chip]
 	
-	return chip_stencils and chip_stencils[index], chip, index, chip_index
+	return chip_stencils and chip_stencils[index], chip, index, chip:EntIndex()
 end
 
 function STENCIL_CORE:NetReadStencilData(stencil)
@@ -129,7 +118,7 @@ function STENCIL_CORE:NetReadStencils()
 		if net.ReadBool() then --true if we are deleting the stencil
 			self:StencilDelete(chip, index, chip_index)
 			self:NetUnwatchEntityCreation(chip_index)
-			--if not IsEntity(chip) or chip:IsValid() then self:StencilDelete(chip, index, chip_index)
+			--if not isentity(chip) or chip:IsValid() then self:StencilDelete(chip, index, chip_index)
 			--else deletions = true end
 		else --otherwise create the stencil if it doesn't exist and update it
 			if not stencil then stencil = self:StencilCreate(chip, index, chip_index) end
@@ -145,7 +134,7 @@ function STENCIL_CORE:NetReadStencils()
 		local stencils = self.Stencils
 		
 		for chip, chip_stencils in pairs(stencils) do
-			if IsEntity(chip) and not chip:IsValid() then
+			if isentity(chip) and not chip:IsValid() then
 				stencils[chip] = nil
 				
 				--for anything still holding a reference to the stencil
@@ -185,7 +174,7 @@ function STENCIL_CORE:NetReadStencilsEntities()
 			
 			--add the entities and ensure they have the render override
 			for index = 1, entity_count do
-				local entity = read_entity(replace_proxy)
+				local entity = entity_proxy.Read()
 				duplicated[entity] = true
 				
 				--duplex_set(entity_layer, index, entity)

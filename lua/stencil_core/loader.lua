@@ -19,7 +19,6 @@ local config = {
 	{
 		block = "client",
 		client = true,
-		compile = "client",
 		menu = "client",
 		server = true,
 		
@@ -27,6 +26,10 @@ local config = {
 			client = true,
 			server = true,
 		}
+	},
+	
+	{
+		compile = "client",
 	}
 }
 

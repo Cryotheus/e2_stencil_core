@@ -1,6 +1,6 @@
 --locals
 local developer = GetConVar("developer")
-local is_entity = IsEntity
+local is_entity_proxy_alive = entity_proxy.IsAlive
 local operations = STENCIL_CORE.Operations
 local parameterized_operations = STENCIL_CORE.ParameterizedOperations
 local render_SetColorModulation = render.SetColorModulation
@@ -124,7 +124,7 @@ function STENCIL_CORE:CompileStencil(stencil)
 		
 		if entities then
 			for index, entity in ipairs(entities) do
-				if is_entity(entity) and entity:IsValid() and not entity:IsDormant() then
+				if entity:IsValid() and not entity:IsDormant() then
 					local color = entity:GetColor()
 					local r, g, b = color.r, color.g, color.b
 					
