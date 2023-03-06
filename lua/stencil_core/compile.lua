@@ -108,6 +108,7 @@ function STENCIL_CORE:CompileStencil(stencil)
 	end
 	
 	--parameterized stuff
+	--[[ POST: implement parameterized stuff
 	if parameterized_instructions[1] ~= nil then
 		local parameter_count = #parameterized_instructions
 		
@@ -115,7 +116,7 @@ function STENCIL_CORE:CompileStencil(stencil)
 			if index == parameter_count then parameter_line = parameter_line .. "local_" .. parameterized_instructions[index]
 			else parameter_line = parameter_line .. "local_" .. parameterized_instructions[index] .. ", " end
 		end
-	end
+	end --]]
 	
 	--create the draw_entities function
 	function self._CompiledDrawEntities(layer_index)
