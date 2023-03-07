@@ -257,6 +257,3 @@ STENCIL_CORE = STENCIL_CORE or {
 	Stencils = {},
 	Version = "0.1.0",
 }
-
---POST: remove this debug
-STENCIL_CORE.Prefabs = prefabs

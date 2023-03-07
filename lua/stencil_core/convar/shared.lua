@@ -7,7 +7,7 @@ local function create_convar(name, ...)
 	return convar
 end
 
---post --TODO: implement entity limits!
+--post
 create_convar("entities", "1024", FCVAR_ARCHIVE + FCVAR_REPLICATED, "The maximum amount of entities a client may add to a stencil.", 2, STENCIL_CORE.MaximumEntityCount)
 create_convar("layer_entities", "256", FCVAR_ARCHIVE + FCVAR_REPLICATED, "The maximum amount of entities a client may put into a single stencil.", 1, STENCIL_CORE.MaximumEntityCount)
 create_convar("layers", "8", FCVAR_ARCHIVE + FCVAR_REPLICATED, "The maximum amount of entity layers a client may create for their stencils.", 2, 65536)
