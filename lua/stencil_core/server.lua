@@ -36,6 +36,8 @@ function STENCIL_CORE:StencilCountEntity(stencil, entity_layer, count)
 end
 
 function STENCIL_CORE:StencilCreate(chip_context, index, nil_instructions)
+	local ply = chip_context.player
+	
 	if self.StencilCounter[ply] >= maximum_stencils then return end
 	
 	local chip = chip_context.entity
@@ -43,7 +45,6 @@ function STENCIL_CORE:StencilCreate(chip_context, index, nil_instructions)
 	
 	if chip_stencils[index] then return end
 	
-	local ply = chip_context.player
 	local stencil = {
 		Chip = chip,
 		ChipIndex = chip:EntIndex(),
@@ -83,6 +84,7 @@ end
 
 function STENCIL_CORE:StencilDelete(chip, index)
 	if self.Stencils[chip][index] then
+		local ply = chip.context.player
 		self.Stencils[chip][index] = nil
 		self.StencilCounter[ply] = self.StencilCounter[ply] - 1
 		
@@ -103,9 +105,10 @@ function STENCIL_CORE:StencilEnable(stencil, enable)
 	end
 end
 
-function STENCIL_CORE:StencilPurge(chip) --POST: we can optimize this
+function STENCIL_CORE:StencilPurge(chip_context) --POST: we can optimize this
 	local count = 0
-	local stencils = self.Stencils[chip]
+	local ply = chip_context.player
+	local stencils = self.Stencils[chip_context.entity]
 	
 	for index, stencil in pairs(stencils) do
 		count = count + 1
@@ -138,7 +141,7 @@ end
 
 --hooks
 hook.Add("PlayerDisconnected", "StencilCore", function(ply) STENCIL_CORE.StencilCounter[ply] = nil end)
-hook.Add("PlayerInitialSpawn", "StencilCore", function(ply) STENCIL_CORE.StencilCounter[ply] = {} end)
+hook.Add("PlayerInitialSpawn", "StencilCore", function(ply) STENCIL_CORE.StencilCounter[ply] = 0 end)
 
 --post
 STENCIL_CORE:ConVarListen("entities", "Core", function(convar) maximum_entities = convar:GetInt() end, true)

@@ -259,12 +259,9 @@ registerCallback("construct",
 
 registerCallback("destruct",
 	function(self)
-		local chip = self.entity
+		STENCIL_CORE:StencilPurge(self)
 		
-		--could make a micro optimization here... we're not gonna talk about it though
-		STENCIL_CORE:StencilPurge(chip)
-		
-		stencil_repo[chip] = nil
+		stencil_repo[self.entity] = nil
 	end
 )
 
