@@ -95,37 +95,6 @@ __e2setcost(1)
 e2function number stencilCount() return STENCIL_CORE.StencilCounter[self.player] end
 e2function number stencilCount(entity ply) return STENCIL_CORE.StencilCounter[ply] or 0 end
 
-__e2setcost(2)
-e2function void stencilEntityCount(number index)
-	local stencil_index = valid_stencil_index(stencil_index)
-		
-	if stencil_index then
-		local stencil = stencil_repo[self.entity][stencil_index]
-		
-		return stencil and stencil.EntityCount
-	end
-
-	return 0
-end
-
-__e2setcost(3)
-e2function void stencilEntityCount(number index, number layer_index)
-	local layer_index = math.floor(layer_index)
-	local stencil_index = valid_stencil_index(stencil_index)
-	
-	if stencil_index then
-		local stencil = stencil_repo[self.entity][stencil_index]
-		
-		if stencil then
-			local entity_layer = stencil.EntityLayers[layer_index]
-			
-			return entity_layer and entity_layer.Count or 0
-		end
-	end
-	
-	return 0
-end
-
 __e2setcost(10)
 e2function void stencilCreate(number stencil_index, number prefab_enum)
 	local stencil_index = valid_stencil_index(stencil_index)
@@ -146,6 +115,37 @@ e2function void stencilEnable(number stencil_index, number visibility)
 	local stencil_index = valid_stencil_index(stencil_index)
 		
 	if stencil_index then STENCIL_CORE:StencilEnable(stencil, visibility ~= 0) end
+end
+
+__e2setcost(2)
+e2function number stencilEntityCount(number stencil_index)
+	local stencil_index = valid_stencil_index(stencil_index)
+		
+	if stencil_index then
+		local stencil = stencil_repo[self.entity][stencil_index]
+		
+		return stencil and stencil.EntityCount
+	end
+
+	return 0
+end
+
+__e2setcost(3)
+e2function number stencilEntityCount(number stencil_index, number layer_index)
+	local layer_index = math.floor(layer_index)
+	local stencil_index = valid_stencil_index(stencil_index)
+	
+	if stencil_index then
+		local stencil = stencil_repo[self.entity][stencil_index]
+		
+		if stencil then
+			local entity_layer = stencil.EntityLayers[layer_index]
+			
+			return entity_layer and entity_layer.Count or 0
+		end
+	end
+	
+	return 0
 end
 
 __e2setcost(3)
