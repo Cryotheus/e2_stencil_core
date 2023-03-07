@@ -57,9 +57,9 @@ local function valid_stencil_index(number) return number == number and number <=
 
 --post function setup
 E2Lib.RegisterExtension("stencils", true, "Allows users to render entities with stencils to create fancy (and possibly headache inducing) visuals.")
-__e2setcost(10)
 
 --e2 functions
+__e2setcost(6)
 e2function void stencilAddEntity(number stencil_index, number layer_index, entity entity)
 	local stencil_index = valid_stencil_index(stencil_index)
 	local layer_index = valid_in_range(layer_index, 1, convar_layers)
@@ -73,6 +73,7 @@ e2function void stencilAddEntity(number stencil_index, number layer_index, entit
 	end
 end
 
+__e2setcost(7)
 e2function void stencilAddEntity(number stencil_index, number layer_index, number hologram_index)
 	local stencil_index = valid_stencil_index(stencil_index)
 	local layer_index = valid_in_range(layer_index, 1, convar_layers)
@@ -87,8 +88,14 @@ e2function void stencilAddEntity(number stencil_index, number layer_index, numbe
 	end
 end
 
+__e2setcost(10)
 e2function void stencilCompile(number stencil_index) error("Don't use this yet, it's not ready. Use stencilCreate instead.") end
 
+__e2setcost(1)
+e2function number stencilCount() return STENCIL_CORE.StencilCounter[self.player] end
+e2function number stencilCount(entity ply) return STENCIL_CORE.StencilCounter[ply] or 0 end
+
+__e2setcost(2)
 e2function void stencilEntityCount(number index)
 	local stencil_index = valid_stencil_index(stencil_index)
 		
@@ -101,6 +108,7 @@ e2function void stencilEntityCount(number index)
 	return 0
 end
 
+__e2setcost(3)
 e2function void stencilEntityCount(number index, number layer_index)
 	local layer_index = math.floor(layer_index)
 	local stencil_index = valid_stencil_index(stencil_index)
@@ -118,6 +126,7 @@ e2function void stencilEntityCount(number index, number layer_index)
 	return 0
 end
 
+__e2setcost(10)
 e2function void stencilCreate(number stencil_index, number prefab_enum)
 	local stencil_index = valid_stencil_index(stencil_index)
 	
@@ -129,14 +138,17 @@ e2function void stencilCreate(number stencil_index, number prefab_enum)
 	end
 end
 
+__e2setcost(8)
 e2function void stencilDelete(number stencil_index) STENCIL_CORE:StencilDelete(self.entity, stencil_index) end
 
+__e2setcost(10)
 e2function void stencilEnable(number stencil_index, number visibility)
 	local stencil_index = valid_stencil_index(stencil_index)
 		
 	if stencil_index then STENCIL_CORE:StencilEnable(stencil, visibility ~= 0) end
 end
 
+__e2setcost(3)
 e2function void stencilHook(number stencil_index, number hook_enum)
 	local hook_enum = valid_in_range(hook_enum, 1, hooks_count)
 	local stencil_index = valid_stencil_index(stencil_index)
@@ -150,6 +162,7 @@ e2function void stencilHook(number stencil_index, number hook_enum)
 	end
 end
 
+__e2setcost(2)
 e2function number stencilInstructionCount(number stencil_index)
 	local stencil_index = valid_stencil_index(stencil_index)
 	
@@ -162,14 +175,17 @@ e2function number stencilInstructionCount(number stencil_index)
 	return 0
 end
 
+__e2setcost(2)
 e2function number stencilPrefabLayerCount(number stencil_index)
 	local prefab = STENCIL_CORE.Prefabs[math.floor(prefab_enum)]
 	
 	return prefab and prefab.LayerCount or 0
 end
 
+__e2setcost(15)
 e2function void stencilPurge() STENCIL_CORE:StencilPurge(self.entity) end
 
+__e2setcost(10)
 e2function void stencilRemoveEntity(number stencil_index, entity entity)
 	local stencil_index = valid_stencil_index(stencil_index)
 	
@@ -184,6 +200,7 @@ e2function void stencilRemoveEntity(number stencil_index, entity entity)
 	self:throw("Invalid stencil index.")
 end
 
+__e2setcost(6)
 e2function void stencilRemoveEntity(number stencil_index, number layer_index, entity entity)
 	local stencil_index = valid_stencil_index(stencil_index)
 	local layer_index = valid_in_range(layer_index, 1, convar_layers)
@@ -199,6 +216,7 @@ e2function void stencilRemoveEntity(number stencil_index, number layer_index, en
 	self:throw("Invalid stencil or layer index.")
 end
 
+__e2setcost(12)
 e2function void stencilRemoveEntity(number stencil_index, number hologram_index)
 	local stencil_index = valid_stencil_index(stencil_index)
 	
@@ -214,6 +232,7 @@ e2function void stencilRemoveEntity(number stencil_index, number hologram_index)
 	self:throw("Invalid stencil index.")
 end
 
+__e2setcost(7)
 e2function void stencilRemoveEntity(number stencil_index, number layer_index, number hologram_index)
 	local stencil_index = valid_stencil_index(stencil_index)
 	local layer_index = valid_in_range(layer_index, 1, convar_layers)
