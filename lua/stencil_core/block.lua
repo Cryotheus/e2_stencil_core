@@ -18,7 +18,7 @@ local function block_player(ply, save)
 		STENCIL_CORE:QueueHookUpdate()
 	end
 	
-	if save then player_query(ply, "insert into `stencil_core_blocks` (`steam_id`) values(%s)") end
+	if save then player_query(ply, "insert or ignore into `stencil_core_blocks` (`steam_id`) values(%s)") end
 end
 
 function player_query(ply, query)
@@ -37,7 +37,7 @@ local function unblock_player(ply, save)
 		STENCIL_CORE:QueueHookUpdate()
 	end
 	
-	if save then player_query(ply, "delete `stencil_core_blocks` where `steam_id` = %s") end
+	if save then player_query(ply, "delete from `stencil_core_blocks` where `steam_id` = %s") end
 end
 
 --stencil core functions
@@ -46,6 +46,7 @@ function STENCIL_CORE:BlockAdd(ply) block_player(ply, true) end
 function STENCIL_CORE:BlockClear()
 	for ply in pairs(blocked_players) do unblock_player(ply) end
 	
+	hook.Call("StencilCoreBlockClear", self)
 	sql.Query("drop * from `stencil_core_blocks`")
 end
 
@@ -65,7 +66,7 @@ function STENCIL_CORE:BlockPromptClear()
 	Derma_Query(
 		"Clear blocked players database, including the offline players?",
 		"Stencil Core - Confirmation",
-		"Yes", function() self:BlockClear() end,
+		"Yes", function() STENCIL_CORE:BlockClear() end,
 		"No"
 	)
 end

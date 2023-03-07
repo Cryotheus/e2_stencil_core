@@ -1,8 +1,9 @@
 --https://github.com/Cryotheus/cryotheums_loader
 local config = {
 	{
-		loader = "download",
 		global = "shared",
+		includes = {entity_proxy = "shared"}, --external include, not part of this addon!
+		loader = "download",
 	},
 	
 	{

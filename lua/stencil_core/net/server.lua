@@ -1,4 +1,4 @@
-include("includes/entity_proxy.lua")
+--include("includes/entity_proxy.lua")
 util.AddNetworkString("stencil_core")
 
 --locals
@@ -209,7 +209,7 @@ function STENCIL_CORE:NetWriteStencilsEntities(queue)
 end
 
 --hooks
-hook.Add("PlayerDisconnected", "StencilCore", function(ply)
+hook.Add("PlayerDisconnected", "StencilCoreNet", function(ply)
 	local player_index = ply:EntIndex()
 	loaded_players[ply] = nil
 	loading_players[ply] = nil
@@ -218,7 +218,7 @@ hook.Add("PlayerDisconnected", "StencilCore", function(ply)
 	hook.Remove("Think", "StencilCoreNet2_" .. player_index)
 end)
 
-hook.Add("PlayerInitialSpawn", "StencilCore", function(ply) loading_players[ply] = true end)
+hook.Add("PlayerInitialSpawn", "StencilCoreNet", function(ply) loading_players[ply] = true end)
 
 --net
 net.Receive("stencil_core", function(length, ply) STENCIL_CORE:NetPlayerLoad(ply) end)

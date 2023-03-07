@@ -196,17 +196,6 @@ local prefabs = {
 }
 
 --post function setup
-for index, pair in ipairs(operations) do --process the operations table
-	local name, code = pair[1], pair[2]
-	operations[index] = name
-	operations[name] = code
-	
-	if string.find(code, "%$") then
-		parameterized_operations[index] = true
-		parameterized_operations[name] = true
-	end
-end
-
 for index, hook_name in ipairs(hooks) do --process the hooks table
 	local first = true
 	local hook_alias = string.upper(string.gsub(hook_name, "%u%l+", function(matched)
@@ -222,6 +211,29 @@ for index, hook_name in ipairs(hooks) do --process the hooks table
 	hook_aliases[index] = hook_alias
 	hook_functions[hook_name] = {}
 	hooks[hook_name] = index
+end
+
+for index, pair in ipairs(operations) do --process the operations table
+	local name, code = pair[1], pair[2]
+	operations[index] = name
+	operations[name] = code
+	
+	if string.find(code, "%$") then
+		parameterized_operations[index] = true
+		parameterized_operations[name] = true
+	end
+end
+
+for index, prefab in ipairs(prefabs) do
+	local layers_used = {}
+	
+	for index, instruction in ipairs(prefab[3]) do
+		local operation = instruction[1]
+		
+		if operation == "draw" or operation == "draw_strict" then layers_used[instruction[2]] = true end
+	end
+	
+	prefab.LayerCount = table.Count(layers_used)
 end
 
 --globals
@@ -241,6 +253,7 @@ STENCIL_CORE = STENCIL_CORE or {
 	Operations = operations,
 	ParameterizedOperations = parameterized_operations,
 	Prefabs = prefabs,
+	StencilCounter = {},
 	Stencils = {},
 	Version = "0.1.0",
 }

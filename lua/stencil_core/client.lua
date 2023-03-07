@@ -70,8 +70,14 @@ function STENCIL_CORE:StencilCreate(chip, index, chip_index)
 				if chip:IsValid() then return end
 				
 				stencils[chip] = nil
+				
+				--unregister the EntityProxy of the chip (do this, or get memory leaks!)
+				entity_proxy.Destroy(stencil.ChipIndex)
 			end)
 		end)
+		
+		--we want manual control over when the EntityProxy is unregistered
+		chip:SetAutoRemoveEntityProxy(false)
 	else chip_stencils[index] = stencil end
 	
 	return stencil
@@ -87,7 +93,12 @@ function STENCIL_CORE:StencilDelete(chip, index)
 		chip_stencils[index] = nil
 		
 		--remove empty tables
-		if not next(chip_stencils) then stencils[chip] = nil end
+		if not next(chip_stencils) then
+			stencils[chip] = nil
+			
+			--unregister the EntityProxy of the chip (do this, or get memory leaks!)
+			entity_proxy.Destroy(stencil.ChipIndex)
+		end
 	end
 end
 

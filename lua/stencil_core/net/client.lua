@@ -1,4 +1,4 @@
-include("includes/entity_proxy.lua")
+--include("includes/entity_proxy.lua")
 
 --locals
 local bits_layer_entities, bits_layers, bits_maximum_stencil_index

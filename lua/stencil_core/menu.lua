@@ -3,42 +3,64 @@ local blocked_players = STENCIL_CORE.BlockedPlayers
 
 --stencil core functions
 function STENCIL_CORE:MenuInit(form)
-	local online_players_sizer
 	
-	form:Button("Refresh List").DoClick = function(self) online_players_sizer:Refresh() end
-	form:Button("Clear All Blocks").DoClick = function(self) STENCIL_CORE:BlockPromptClear() end
 	
-	do --blocks category
+	do --blocked players list
 		local category = vgui.Create("DCollapsibleCategory", form)
 		
-		form:AddItem(category)
 		category:SetLabel("Block Players")
+		form:AddItem(category)
 		
-		do --online players
-			online_players_sizer = vgui.Create("DSizeToContents", category)
+		do --clear button
+			local button = vgui.Create("DButton", category)
 			
-			function online_players_sizer:PerformLayout(width, height) self:SizeToChildren(false, true) end
+			button:Dock(TOP)
+			button:DockMargin(0, 5, 0, 0)
+			button:SetText("Clear All Blocks")
 			
-			function online_players_sizer:Refresh()
-				local local_player = LocalPlayer()
+			function button:DoClick() STENCIL_CORE:BlockPromptClear() end
+		end
+		
+		do --refresh button
+			local button = vgui.Create("DButton", category)
+			
+			button:Dock(TOP)
+			button:DockMargin(0, 5, 0, 3)
+			button:SetText("Refresh List")
+			
+			function button:DoClick() category:RefreshPlayers() end
+		end
+		
+		function category:RefreshPlayers()
+			local children = self:GetChildren()
+			local local_player = LocalPlayer()
+			
+			--iterate backwards to remove children without skipping panels
+			for index = #children, 1, -1 do
+				local panel = children[index]
 				
-				self:Clear()
+				if panel:GetName() == "DCheckBoxLabel" then panel:Remove() end
+			end
+			
+			for index, ply in ipairs(player.GetHumans()) do
+				local check_box = vgui.Create("DCheckBoxLabel", self)
+				local steam_id64 = ply:SteamID64()
 				
-				for index, ply in ipairs(player.GetHumans()) do
-					if ply ~= local_player then
-						local check_box = vgui.Create("DCheckBoxLabel", self)
-						
-						check_box:SetChecked(blocked_players)
-						check_box:SetText(ply:GetName() .. " (" .. ply:SteamID() .. ")")
-						
-						function check_box:OnChange(value)
-							if value then STENCIL_CORE:BlockAdd(ply)
-							else STENCIL_CORE:BlockRemove(ply) end
-						end
-					end
+				check_box:Dock(TOP)
+				check_box:DockMargin(0, 2, 0, 0)
+				check_box:SetChecked(blocked_players[ply])
+				check_box:SetDark(true)
+				check_box:SetText(ply:GetName() .. " (" .. ply:SteamID() .. ")")
+				
+				function check_box:OnChange(value)
+					if value then STENCIL_CORE:BlockAdd(ply:IsValid() and ply or steam_id64)
+					else STENCIL_CORE:BlockRemove(ply:IsValid() and ply or steam_id64) end
 				end
 			end
 		end
+		
+		category:RefreshPlayers()
+		hook.Add("StencilCoreBlockClear", category, category.RefreshPlayers)
 	end
 end
 
