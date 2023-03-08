@@ -5,15 +5,16 @@
 	"tags"		:	[ "scenic" ],
 	"ignore"	:
 	[
+		".git*",
 		"*.bat",
 		"*.gma",
+		"*.md",
 		"*.pdn",
 		"*.txt",
 		"*.zip",
-		".git*",
+		"icon.jpg",
 		"license",
 		"LICENSE",
-		"*.md",
 		"wiki/*"
 	]
 }
