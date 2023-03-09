@@ -38,7 +38,7 @@ local hooks = {
 
 local operations = {
 	{"clear_stencil", "render.ClearStencil()"},
-	{"clear", "render.ClearBuffersObeyStencil($.r, $.g, $.b, $.a)"},
+	{"clear", "render.ClearBuffersObeyStencil($.r, $.g, $.b, $.a, true)"},
 	{"draw", "draw_entities($)"},
 	{"draw_strict", draw_strict},
 	{"enabled", "render.SetStencilEnable($)"},
@@ -52,11 +52,24 @@ local operations = {
 	{"set_write_mask", "render.SetStencilWriteMask($)"},
 }
 
+--[[
+operations that are inserted before draw operations if missing
+{"clear_stencil", true},
+{"enabled", true},
+{"set_compare", STENCIL_ALWAYS},
+{"set_fail_operation", STENCIL_KEEP},
+{"set_occluded_operation", STENCIL_KEEP},
+{"set_pass_operation", STENCIL_KEEP},
+{"set_reference_value", 1},
+{"set_test_mask", 255},
+{"set_write_mask", 255},
+]]
+
 local prefabs = {
 	--fail prefabs
 	{
 		"fail", {}, {
-			{"set_compare", STENCIL_ALWAYS},
+			--{"set_compare", STENCIL_ALWAYS},
 			{"set_pass_operation", STENCIL_REPLACE},
 			
 			{"draw", 2},
@@ -90,11 +103,11 @@ local prefabs = {
 	--occluded_fail
 	{
 		"occluded_fail", {}, {
-			{"set_compare", STENCIL_ALWAYS},
-			{"set_fail_operation", STENCIL_KEEP},
+			--{"set_compare", STENCIL_ALWAYS},
+			--{"set_fail_operation", STENCIL_KEEP},
 			{"set_occluded_operation", STENCIL_REPLACE},
-			{"set_pass_operation", STENCIL_KEEP},
-			{"set_reference_value", 1},
+			--{"set_pass_operation", STENCIL_KEEP},
+			--{"set_reference_value", 1},
 			
 			{"draw", 1},
 			
@@ -109,11 +122,11 @@ local prefabs = {
 		"pass", {}, {
 			{"set_compare", STENCIL_NEVER},
 			{"set_fail_operation", STENCIL_REPLACE},
-			{"set_occluded_operation", STENCIL_KEEP},
-			{"set_pass_operation", STENCIL_KEEP},
-			{"set_reference_value", 1},
-			{"set_test_mask", 255},
-			{"set_write_mask", 255},
+			--{"set_occluded_operation", STENCIL_KEEP},
+			--{"set_pass_operation", STENCIL_KEEP},
+			--{"set_reference_value", 1},
+			--{"set_test_mask", 255},
+			--{"set_write_mask", 255},
 			
 			{"draw", 1},
 			
@@ -128,13 +141,8 @@ local prefabs = {
 	--pass_cleared
 	{
 		"pass_cleared", {10}, {
-			{"set_compare", STENCIL_ALWAYS},
-			{"set_fail_operation", STENCIL_KEEP},
-			{"set_occluded_operation", STENCIL_KEEP},
+			--{"set_compare", STENCIL_ALWAYS},
 			{"set_pass_operation", STENCIL_REPLACE},
-			{"set_reference_value", 1},
-			{"set_test_mask", 255},
-			{"set_write_mask", 255},
 			
 			{"draw", 1},
 			
@@ -150,11 +158,11 @@ local prefabs = {
 		"pass_twice", {}, {
 			{"set_compare", STENCIL_NEVER},
 			{"set_fail_operation", STENCIL_INCR},
-			{"set_occluded_operation", STENCIL_KEEP},
-			{"set_pass_operation", STENCIL_KEEP},
-			{"set_reference_value", 1},
-			{"set_test_mask", 255},
-			{"set_write_mask", 255},
+			--{"set_occluded_operation", STENCIL_KEEP},
+			--{"set_pass_operation", STENCIL_KEEP},
+			--{"set_reference_value", 1},
+			--{"set_test_mask", 255},
+			--{"set_write_mask", 255},
 			
 			{"draw", 1},
 			{"draw", 2},
@@ -173,11 +181,11 @@ local prefabs = {
 		"pass_twice_both", {}, {
 			{"set_compare", STENCIL_NEVER},
 			{"set_fail_operation", STENCIL_INCR},
-			{"set_occluded_operation", STENCIL_KEEP},
-			{"set_pass_operation", STENCIL_KEEP},
-			{"set_reference_value", 1},
-			{"set_test_mask", 255},
-			{"set_write_mask", 255},
+			--{"set_occluded_operation", STENCIL_KEEP},
+			--{"set_pass_operation", STENCIL_KEEP},
+			--{"set_reference_value", 1},
+			--{"set_test_mask", 255},
+			--{"set_write_mask", 255},
 			
 			{"draw", 1},
 			{"draw", 2},
