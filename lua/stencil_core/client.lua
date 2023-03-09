@@ -46,7 +46,6 @@ function STENCIL_CORE:RestoreEntityRender(entity)
 end
 
 function STENCIL_CORE:StencilCreate(chip, index, chip_index)
-	print("StencilCreate", chip, index)
 	local chip_index = chip_index or chip:EntIndex()
 	local chip_stencils = stencils[chip]
 	local stencil = {
@@ -84,7 +83,6 @@ function STENCIL_CORE:StencilCreate(chip, index, chip_index)
 end
 
 function STENCIL_CORE:StencilDelete(chip, index)
-	print("StencilDelete", chip, index)
 	local chip_stencils = stencils[chip]
 	
 	if chip_stencils then
