@@ -176,7 +176,7 @@ e2function number stencilInstructionCount(number stencil_index)
 end
 
 __e2setcost(2)
-e2function number stencilPrefabLayerCount(number stencil_index)
+e2function number stencilPrefabLayerCount(number prefab_enum)
 	local prefab = STENCIL_CORE.Prefabs[math.floor(prefab_enum)]
 	
 	return prefab and prefab.LayerCount or 0
