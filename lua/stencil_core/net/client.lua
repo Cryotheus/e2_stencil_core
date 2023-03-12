@@ -28,7 +28,17 @@ function STENCIL_CORE:NetReadStencils()
 	while net.ReadBool() do
 		local chip_proxy, stencil_index, stencil = self:NetReadStencilIdentifier()
 		
-		if net.ReadBool() then self:StencilDelete(chip_proxy, stencil_index) --true: remove stencil
+		if net.ReadBool() then --true: remove stencil
+			self:StencilDelete(chip_proxy, stencil_index)
+			
+			if stencil then
+				for layer_index, entity_layer in pairs(stencil.EntityLayers) do
+					for index, proxy in ipairs(entity_layer) do
+						proxy:DecrementEntityProxyReferenceCount()
+						self:RestoreEntityRender(proxy)
+					end
+				end
+			end
 		else --false: update/create stencil
 			if net.ReadBool() then --true: we have stencil data to read
 				if not stencil then stencil = self:StencilCreate(chip_proxy, stencil_index) end
@@ -81,8 +91,7 @@ function STENCIL_CORE:NetReadStencils()
 					for index, proxy in ipairs(entity_layer) do
 						entity_layer[index] = nil
 						entity_layer[proxy] = nil
-						
-						duplex_insert(removed_proxies, proxy)
+						removed_proxies[proxy] = true
 					end
 				end
 				
@@ -100,14 +109,17 @@ function STENCIL_CORE:NetReadStencils()
 						local proxy = entity_proxy.Read("StencilCore")
 						
 						if removed_proxies[proxy] then removed_proxies[proxy] = nil
-						else self:OverrideEntityRender(proxy) end
+						else
+							proxy:IncrementEntityProxyReferenceCount()
+							self:OverrideEntityRender(proxy)
+						end
 						
 						duplex_insert(entity_layer, proxy)
 					end
 				end
 				
 				--garbage collect the proxies
-				for index, proxy in ipairs(removed_proxies) do
+				for proxy in pairs(removed_proxies) do
 					proxy:DecrementEntityProxyReferenceCount()
 					self:RestoreEntityRender(proxy)
 				end

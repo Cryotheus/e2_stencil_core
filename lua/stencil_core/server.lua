@@ -64,8 +64,9 @@ function STENCIL_CORE:StencilCreate(chip_context, index, nil_instructions)
 	
 	if self.StencilCounter[ply] >= maximum_stencils then return end
 	
+	local stencils = self.Stencils
 	local chip = chip_context.entity
-	local chip_stencils = self.Stencils[chip]
+	local chip_stencils = stencils[chip]
 	local existing_stencil = chip_stencils[index]
 	
 	if existing_stencil then return existing_stencil end
@@ -84,6 +85,17 @@ function STENCIL_CORE:StencilCreate(chip_context, index, nil_instructions)
 		Parameters = {},
 		Prefab = nil,
 	}
+	
+	--[[
+	if not next(chip_stencils) then
+		chip:CallOnRemove("StencilCore", function()
+			if stencils[chip] then
+				stencils[chip] = nil
+				
+				self:StencilPurge(chip_context)
+			end
+		end)
+	end --]]
 	
 	chip_stencils[index] = stencil
 	self.StencilCounter[ply] = self.StencilCounter[ply] + 1
@@ -151,32 +163,58 @@ function STENCIL_CORE:StencilPurge(chip_context) --POST: we can optimize this
 end
 
 function STENCIL_CORE:StencilRemoveEntity(entity, stencil, layer_index)
-	local entity = entity_proxy.Get("StencilCore", entity)
-	local entity_layers = stencil.EntityLayers
-	local entity_layers_changes = stencil.EntityChanges
+	local proxy = entity_proxy.GetExisting("StencilCore", entity)
 	
-	if layer_index then
+	--all stencil entities are proxied, so if this entity isn't proxied then it doesn't need to be removed
+	if not proxy then return end
+	
+	local entity_layers = stencil.EntityLayers
+	
+	if layer_index then --removing entity from specific layer
 		local entity_layer = entity_layers[layer_index]
-		local entity_layer_changes = entity_layers_changes[layer_index]
 		
-		if entity_layer[entity] then
-			duplex_remove(entity_layer, entity)
+		if entity_layer[proxy] then
+			--remove callback
+			proxy.OnProxiedEntityRemove = nil
+			
+			duplex_remove(entity_layer, proxy)
 			self:NetQueueStencil(stencil)
 			self:StencilCountEntity(stencil, entity_layer, -1)
-			self:StencilEntityChanged(entity, stencil, layer_index, false)
-			
-			if entity_layer_changes[entity] then entity_layer_changes[entity] = nil
-			else entity_layer_changes[entity] = false end
+			self:StencilEntityChanged(proxy, stencil, layer_index, false)
 		end
 		
 		return
 	end
 	
-	for layer_index, entity_layer in pairs(entity_layers) do if entity_layer[entity] then duplex_remove(entity_layer, entity) end end
+	--removing entity from all layers
+	local need_queue = false
+	
+	for layer_index, entity_layer in pairs(entity_layers) do
+		if entity_layer[proxy] then
+			need_queue = true
+			
+			duplex_remove(entity_layer, proxy)
+			self:StencilCountEntity(stencil, entity_layer, -1)
+			self:StencilEntityChanged(proxy, stencil, layer_index, false)
+		end
+	end
+	
+	if need_queue then self:NetQueueStencil(stencil) end
 end
 
 --hooks
-hook.Add("PlayerDisconnected", "StencilCore", function(ply) STENCIL_CORE.StencilCounter[ply] = nil end)
+hook.Add("PlayerDisconnected", "StencilCore", function(ply)
+	STENCIL_CORE.StencilCounter[ply] = nil
+	
+	--remove stencils for all their chips
+	--I don't care if they should stay, I don't want to deal with something as nightmarish as this
+	for chip in pairs(STENCIL_CORE.Stencils) do
+		local chip_context = chip.context
+		
+		if chip_context.player == ply then STENCIL_CORE:StencilPurge(chip_context) end
+	end
+end)
+
 hook.Add("PlayerInitialSpawn", "StencilCore", function(ply) STENCIL_CORE.StencilCounter[ply] = 0 end)
 
 --post

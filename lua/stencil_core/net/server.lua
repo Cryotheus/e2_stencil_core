@@ -51,6 +51,8 @@ function STENCIL_CORE:NetQueueStencilInternal(stencil, behavior, queued_stencils
 		
 		table.insert(queued_stencils, {
 			ChipIndex = stencil.ChipIndex,
+			EntityChanges = stencil.EntityChanges,
+			EntityLayers = stencil.EntityLayers,
 			Index = stencil.Index,
 			NetRemove = true,
 		})
@@ -108,7 +110,24 @@ function STENCIL_CORE:NetThink(queued_stencils, target)
 		net.WriteBool(true)
 		self:NetWriteStencilIdentifier(queued_stencil)
 		
-		if queued_stencil.NetRemove then net.WriteBool(true)
+		if queued_stencil.NetRemove then
+			net.WriteBool(true)
+			
+			for layer_index, entity_layer in pairs(queued_stencil.EntityLayers) do
+				for index, proxy in ipairs(entity_layer) do
+					--we still need to make sure the proxy gets removed, so decrement the reference count
+					proxy:DecrementEntityProxyReferenceCount()
+				end
+			end
+			
+			for layer_index, entity_layer in pairs(queued_stencil.EntityChanges) do
+				for proxy, added in pairs(entity_layer) do
+					if not added then
+						--we still need to make sure the proxy gets removed, so decrement the reference count
+						proxy:DecrementEntityProxyReferenceCount()
+					end
+				end
+			end
 		else
 			net.WriteBool(false)
 			
@@ -153,6 +172,7 @@ function STENCIL_CORE:NetThink(queued_stencils, target)
 					entities_added_layer.Count, entities_removed_layer.Count = added_count, removed_count
 					entities_added[layer_index], entities_removed[layer_index] = entities_added_layer, entities_removed_layer
 					entity_changes = entity_changes + added_count + removed_count
+					entity_layers_changes[layer_index] = nil
 				end
 			end
 			
@@ -247,7 +267,6 @@ function STENCIL_CORE:NetWriteStencilData(stencil)
 end
 
 function STENCIL_CORE:NetWriteStencilIdentifier(stencil)
-	print("NetWriteStencilIdentifier", stencil.Chip, stencil.Index, stencil)
 	entity_proxy.Write(stencil.ChipIndex)
 	net.WriteUInt(stencil.Index, bits_maximum_stencil_index)
 end

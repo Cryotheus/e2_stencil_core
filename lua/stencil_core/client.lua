@@ -45,14 +45,14 @@ function STENCIL_CORE:RestoreEntityRender(proxy)
 	end
 end
 
-function STENCIL_CORE:StencilCreate(chip_proxy, index)
+function STENCIL_CORE:StencilCreate(chip_proxy, stencil_index)
 	local chip_stencils = stencils[chip_proxy]
 	local stencil = {
 		Chip = chip_proxy,
 		ChipIndex = chip_proxy:EntIndex(), --null entity safety
 		EntityLayers = {},
 		Hook = nil, --size hint
-		Index = index,
+		Index = stencil_index,
 		Owner = NULL, --size hint
 		Parameters = {},
 		Prefab = nil, --size hint
@@ -60,30 +60,40 @@ function STENCIL_CORE:StencilCreate(chip_proxy, index)
 	}
 	
 	if not chip_stencils then
-		chip_stencils = {[index] = stencil}
+		chip_stencils = {[stencil_index] = stencil}
 		stencils[chip_proxy] = chip_stencils
 		
-		function chip_proxy:OnProxiedEntityRemove() stencils[chip_proxy] = nil end
-	else chip_stencils[index] = stencil end
+		--[[function chip_proxy:OnProxiedEntityRemove()
+			if stencils[self] then STENCIL_CORE:StencilDelete(self) end
+			
+			return true
+		end]]
+	else chip_stencils[stencil_index] = stencil end
 	
 	return stencil
 end
 
-function STENCIL_CORE:StencilDelete(chip_proxy, index)
+function STENCIL_CORE:StencilDelete(chip_proxy, stencil_index)
 	local chip_stencils = stencils[chip_proxy]
 	
-	if chip_stencils then
-		local stencil = chip_stencils[index]
-		stencil.Removed = true --for anything still holding a reference to the stencil
-		chip_stencils[index] = nil
+	if not chip_stencils then return end
+	
+	self:StencilDeleteInternal(chip_proxy, chip_stencils, stencil_index)
+	--if stencil_index then self:StencilDeleteInternal(chip_proxy, chip_stencils, stencil_index)
+	--else for stencil_index in pairs(chip_stencils) do self:StencilDeleteInternal(chip_proxy, chip_stencils, stencil_index) end end
+end
+
+function STENCIL_CORE:StencilDeleteInternal(chip_proxy, chip_stencils, stencil_index)
+	local stencil = chip_stencils[stencil_index]
+	chip_stencils[stencil_index] = nil
+	stencil.Removed = true --for anything still holding a reference to the stencil
+	
+	--remove empty tables
+	if not next(chip_stencils) then
+		stencils[chip_proxy] = nil
 		
-		--remove empty tables
-		if not next(chip_stencils) then
-			stencils[chip_proxy] = nil
-			
-			--unregister the EntityProxy of the chip (do this, or get memory leaks!)
-			chip_proxy:Destroy()
-		end
+		--unregister the EntityProxy of the chip (do this, or get memory leaks!)
+		chip_proxy:Destroy()
 	end
 end
 
