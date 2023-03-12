@@ -66,8 +66,9 @@ function STENCIL_CORE:StencilCreate(chip_context, index, nil_instructions)
 	
 	local chip = chip_context.entity
 	local chip_stencils = self.Stencils[chip]
+	local existing_stencil = chip_stencils[index]
 	
-	if chip_stencils[index] then return end
+	if existing_stencil then return existing_stencil end
 	
 	local stencil = {
 		Chip = chip,

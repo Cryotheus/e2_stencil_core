@@ -14,7 +14,7 @@ local stop_net_message_at = 60000 --roughly 58.5kb
 
 --local functions
 local function bits(decimal) return math.ceil(math.log(decimal, 2)) end
-local function stencil_equal(first, second) return first == second or (first.ChipID == second.ChipID and first.Index == second.Index) end
+local function stencil_equal(first, second) return first == second or (first.ChipIndex == second.ChipIndex and first.Index == second.Index) end
 
 --post function setup
 local bits_hooks = bits(#STENCIL_CORE.Hooks)
@@ -54,7 +54,7 @@ function STENCIL_CORE:NetQueueStencilInternal(stencil, behavior, queued_stencils
 		end
 		
 		table.insert(queued_stencils, {
-			ChipID = stencil.ChipID,
+			ChipIndex = stencil.ChipIndex,
 			Index = stencil.Index,
 			NetRemove = true,
 		})
@@ -108,11 +108,11 @@ function STENCIL_CORE:NetThink(queued_stencils, target)
 			--POST: write parameters
 			
 			local entity_changes = 0
-			local entity_layers = stencil.EntityLayers
-			local entity_layers_changes = stencil.EntityChanges
+			local entity_layers = queued_stencil.EntityLayers
+			local entity_layers_changes = queued_stencil.EntityChanges
 			local entities_added = {}
 			local entities_removed = {}
-			local total_entity_count = stencil.EntityCount
+			local total_entity_count = queued_stencil.EntityCount
 			
 			--first we need to count the changes (and prepare the lists)
 			for layer_index, entity_layer in pairs(entity_layers) do
@@ -235,7 +235,14 @@ function STENCIL_CORE:NetWriteStencilData(stencil)
 	end 
 end
 
+
+
+
+
 function STENCIL_CORE:NetWriteStencilIdentifier(stencil)
+	print("stencil")
+	PrintTable(stencil)
+	
 	entity_proxy.Write(stencil.ChipIndex)
 	net.WriteUInt(stencil.Index, bits_maximum_stencil_index)
 end

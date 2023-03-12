@@ -5,7 +5,7 @@ local duplex_insert = STENCIL_CORE._DuplexInsert
 
 --local functions
 local function bits(decimal) return math.ceil(math.log(decimal, 2)) end
---local function stencil_equal(first, second) return first == second or (first.ChipID == second.ChipID and first.Index == second.Index) end
+--local function stencil_equal(first, second) return first == second or (first.ChipIndex == second.ChipIndex and first.Index == second.Index) end
 
 --post function setup
 local bits_hooks = bits(#STENCIL_CORE.Hooks)
