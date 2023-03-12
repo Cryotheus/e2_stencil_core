@@ -2,6 +2,8 @@ include("includes/entity_proxy.lua")
 util.AddNetworkString("StencilCore")
 
 --locals
+local duplex_insert = STENCIL_CORE._DuplexInsert
+local duplex_remove = STENCIL_CORE._DuplexRemove
 local loaded_players = STENCIL_CORE.LoadedPlayers --duplex!
 local loading_players = STENCIL_CORE.LoadingPlayers
 local player_queued_stencils = {}
@@ -98,7 +100,7 @@ function STENCIL_CORE:NetThink(queued_stencils, target)
 	--if something changed and we're still hooked, destroy the hook
 	if not queued_stencils[1] then return true end
 	
-	--TODO: set the NetSent field to true on the stencil once sent
+	local allow_writing = not target --POST: optimize targetted messages
 	local completed = 0
 	local queue_length = #queued_stencils
 	
@@ -113,25 +115,27 @@ function STENCIL_CORE:NetThink(queued_stencils, target)
 		if queued_stencil.NetRemove then
 			net.WriteBool(true)
 			
-			for layer_index, entity_layer in pairs(queued_stencil.EntityLayers) do
-				for index, proxy in ipairs(entity_layer) do
-					--we still need to make sure the proxy gets removed, so decrement the reference count
-					proxy:DecrementEntityProxyReferenceCount()
-				end
-			end
-			
-			for layer_index, entity_layer in pairs(queued_stencil.EntityChanges) do
-				for proxy, added in pairs(entity_layer) do
-					if not added then
+			if allow_writing then
+				for layer_index, entity_layer in pairs(queued_stencil.EntityLayers) do
+					for index, proxy in ipairs(entity_layer) do
 						--we still need to make sure the proxy gets removed, so decrement the reference count
 						proxy:DecrementEntityProxyReferenceCount()
+					end
+				end
+				
+				for layer_index, entity_layer in pairs(queued_stencil.EntityChanges) do
+					for proxy, added in pairs(entity_layer) do
+						if not added then
+							--we still need to make sure the proxy gets removed, so decrement the reference count
+							proxy:DecrementEntityProxyReferenceCount()
+						end
 					end
 				end
 			end
 		else
 			net.WriteBool(false)
 			
-			queued_stencil.NetSent = true
+			if allow_writing then queued_stencil.NetSent = true end
 			
 			if queued_stencil.NetCreate then
 				net.WriteBool(true)
@@ -172,12 +176,13 @@ function STENCIL_CORE:NetThink(queued_stencils, target)
 					entities_added_layer.Count, entities_removed_layer.Count = added_count, removed_count
 					entities_added[layer_index], entities_removed[layer_index] = entities_added_layer, entities_removed_layer
 					entity_changes = entity_changes + added_count + removed_count
-					entity_layers_changes[layer_index] = nil
+					
+					if allow_writing then entity_layers_changes[layer_index] = nil end
 				end
 			end
 			
 			--the we do the actual writing
-			if entity_changes < total_entity_count * full_entity_sync_bias then 
+			if allow_writing and entity_changes < total_entity_count * full_entity_sync_bias then 
 				net.WriteBool(true) --true: syncing with changes
 				
 				for layer_index, entity_layer in pairs(entity_layers) do
@@ -197,9 +202,9 @@ function STENCIL_CORE:NetThink(queued_stencils, target)
 							entity_proxy.Write(proxy)
 							
 							--we still need to make sure the proxy gets removed, so decrement the reference count
-							proxy:DecrementEntityProxyReferenceCount()
+							if allow_writing then proxy:DecrementEntityProxyReferenceCount() end
 						end
-					else entity_layers[layer_index] = nil end
+					elseif allow_writing then entity_layers[layer_index] = nil end
 				end
 				
 				--list ends here
@@ -222,7 +227,7 @@ function STENCIL_CORE:NetThink(queued_stencils, target)
 				--garbage collection
 				for layer_index, entity_layer in pairs(entities_removed) do
 					--we still need to make sure the proxy gets removed, so decrement the reference count
-					for index, proxy in ipairs(entity_layer) do proxy:DecrementEntityProxyReferenceCount() end
+					for index, proxy in ipairs(entity_layer) do if allow_writing then proxy:DecrementEntityProxyReferenceCount() end end
 				end
 			end
 		end
@@ -273,19 +278,16 @@ end
 
 --hook
 hook.Add("PlayerDisconnected", "StencilCoreNet", function(ply)
-	local loaded_players_index = loaded_players[ply]
 	loading_players[ply] = nil
 	
-	if loaded_players_index then
-		loaded_players[loaded_players_index] = nil
-		loaded_players[ply] = nil
-	end
+	if loaded_players[ply] then duplex_remove(loaded_players, ply) end
 	
 	hook.Remove("Think", "StencilCoreNet" .. ply:EntIndex())
 end)
 
 hook.Add("PlayerInitialSpawn", "StencilCoreNet", function(ply) loading_players[ply] = true end)
 
+--net
 hook.Add("SetupMove", "StencilCoreNet", function(ply, _move, command)
 	if loading_players[ply] and not command:IsForced() then
 		local identifier = "StencilCoreNet" .. ply:EntIndex()
@@ -293,11 +295,17 @@ hook.Add("SetupMove", "StencilCoreNet", function(ply, _move, command)
 		loading_players[ply] = false
 		player_queued_stencils[ply] = queued_stencils
 		
+		for chip, chip_stencils in pairs(STENCIL_CORE.Stencils) do
+			--queue up all the stencils
+			for stencil_index, stencil in pairs(chip_stencils) do STENCIL_CORE:NetQueueStencilInternal(stencil, true, queued_stencils, true) end
+		end
+		
 		hook.Add("Think", identifier, function()
-			if STENCIL_CORE:NetThink(queued_stencils, ply) then
-				loaded_players[ply] = table.insert(loaded_players, ply)
+			if STENCIL_CORE:NetThink(queued_stencils, ply, true) then
 				loading_players[ply] = nil
+				player_queued_stencils[ply] = nil
 				
+				duplex_insert(loaded_players, ply)
 				hook.Remove("Think", identifier)
 			end
 		end)

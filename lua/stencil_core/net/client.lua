@@ -63,7 +63,13 @@ function STENCIL_CORE:NetReadStencils()
 			
 			if net.ReadBool() then
 				while net.ReadBool() do
-					local entity_layer = entity_layers[net.ReadUInt(bits_layers) + 1]
+					local layer_index = net.ReadUInt(bits_layers) + 1
+					local entity_layer = entity_layers[layer_index]
+					
+					if not entity_layer then
+						entity_layer = {}
+						entity_layers[layer_index] = entity_layer
+					end
 					
 					--entities added
 					for index = 1, net.ReadUInt(bits_layer_entities) do
