@@ -2,6 +2,7 @@ include("includes/entity_proxy.lua")
 
 --locals
 local duplex_insert = STENCIL_CORE._DuplexInsert
+local duplex_remove = STENCIL_CORE._DuplexRemove
 
 --local functions
 local function bits(decimal) return math.ceil(math.log(decimal, 2)) end
@@ -24,13 +25,13 @@ function STENCIL_CORE:NetReadStencilIdentifier()
 end
 
 function STENCIL_CORE:NetReadStencils()
-	repeat
+	while net.ReadBool() do
 		local chip_proxy, stencil_index, stencil = self:NetReadStencilIdentifier()
 		
 		if net.ReadBool() then self:StencilDelete(chip_proxy, stencil_index) --true: remove stencil
 		else --false: update/create stencil
 			if net.ReadBool() then --true: we have stencil data to read
-				if not stencil then stencil = self:StencilCreate(chip, stencil_index) end
+				if not stencil then stencil = self:StencilCreate(chip_proxy, stencil_index) end
 				
 				stencil.Owner = net.ReadEntity() --reliable enough that we don't need a proxy
 				stencil.Hook = self.Hooks[net.ReadUInt(bits_hooks) + 1]
@@ -60,6 +61,7 @@ function STENCIL_CORE:NetReadStencils()
 						
 						duplex_insert(entity_layer, proxy)
 						proxy:IncrementEntityProxyReferenceCount()
+						self:OverrideEntityRender(proxy)
 					end
 					
 					--entities removed
@@ -68,6 +70,7 @@ function STENCIL_CORE:NetReadStencils()
 						
 						duplex_remove(entity_layer, proxy)
 						proxy:DecrementEntityProxyReferenceCount()
+						self:RestoreEntityRender(proxy)
 					end
 				end
 			else
@@ -85,21 +88,34 @@ function STENCIL_CORE:NetReadStencils()
 				
 				--insert proxies and undo the removal marking
 				while net.ReadBool() do
-					local entity_layer = entity_layers[net.ReadUInt(bits_layers) + 1]
+					local layer_index = net.ReadUInt(bits_layers) + 1
+					local entity_layer = entity_layers[layer_index]
+					
+					if not entity_layer then
+						entity_layer = {}
+						entity_layers[layer_index] = entity_layer
+					end
 					
 					for index = 1, net.ReadUInt(bits_layer_entities) do
 						local proxy = entity_proxy.Read("StencilCore")
-						removed_proxies[proxy] = nil
+						
+						if removed_proxies[proxy] then removed_proxies[proxy] = nil
+						else self:OverrideEntityRender(proxy) end
 						
 						duplex_insert(entity_layer, proxy)
 					end
 				end
 				
 				--garbage collect the proxies
-				for index, proxy in ipairs(removed_proxies) do proxy:DecrementEntityProxyReferenceCount() end
+				for index, proxy in ipairs(removed_proxies) do
+					proxy:DecrementEntityProxyReferenceCount()
+					self:RestoreEntityRender(proxy)
+				end
 			end
 		end
-	until not net.ReadBool()
+	end
+	
+	self:QueueHookUpdate()
 end
 
 --net

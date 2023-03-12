@@ -13,12 +13,12 @@ end
 StencilCoreTypicalRender = true
 
 --stencil core functions
-function STENCIL_CORE:OverrideEntityRender(entity)
-	if entity.RenderOverride == render_override then return end
+function STENCIL_CORE:OverrideEntityRender(proxy)
+	if proxy.RenderOverride == render_override then return end
 	
-	local old_render_override = entity.RenderOverrideX_StencilCore or entity.RenderOverride
-	entity.RenderOverride = render_override
-	entity.RenderOverrideX_StencilCore = old_render_override
+	local old_render_override = proxy.RenderOverrideX_StencilCore or proxy.RenderOverride
+	proxy.RenderOverride = render_override
+	proxy.RenderOverrideX_StencilCore = old_render_override
 end
 
 function STENCIL_CORE:QueueHookUpdate()
@@ -34,22 +34,22 @@ function STENCIL_CORE:QueueHookUpdate()
 	end)
 end
 
-function STENCIL_CORE:RestoreEntityRender(entity)
-	if entity.RenderOverride == render_override then
+function STENCIL_CORE:RestoreEntityRender(proxy)
+	if proxy.RenderOverride == render_override then
 		--friend asked about this line when I was streaming in a discord call
 		--so in case you don't know, the following is equivalent to:
-		--entity.RenderOverride = entity.RenderOverrideX_StencilCore
-		--entity.RenderOverrideX_StencilCore = nil
+		--proxy.RenderOverride = proxy.RenderOverrideX_StencilCore
+		--proxy.RenderOverrideX_StencilCore = nil
 		--but done in a single line
-		entity.RenderOverride, entity.RenderOverrideX_StencilCore = entity.RenderOverrideX_StencilCore
+		proxy.RenderOverride, proxy.RenderOverrideX_StencilCore = proxy.RenderOverrideX_StencilCore
 	end
 end
 
-function STENCIL_CORE:StencilCreate(chip, index)
-	local chip_stencils = stencils[chip]
+function STENCIL_CORE:StencilCreate(chip_proxy, index)
+	local chip_stencils = stencils[chip_proxy]
 	local stencil = {
-		Chip = chip,
-		ChipIndex = chip:EntIndex(), --null entity safety
+		Chip = chip_proxy,
+		ChipIndex = chip_proxy:EntIndex(), --null entity safety
 		EntityLayers = {},
 		Hook = nil, --size hint
 		Index = index,
@@ -61,12 +61,9 @@ function STENCIL_CORE:StencilCreate(chip, index)
 	
 	if not chip_stencils then
 		chip_stencils = {[index] = stencil}
-		stencils[chip] = chip_stencils
+		stencils[chip_proxy] = chip_stencils
 		
-		function chip:OnProxiedEntityRemove() stencils[chip] = nil end
-		
-		--we want manual control over when the EntityProxy is unregistered
-		chip:SetAutoRemoveEntityProxy(false)
+		function chip_proxy:OnProxiedEntityRemove() stencils[chip_proxy] = nil end
 	else chip_stencils[index] = stencil end
 	
 	return stencil
@@ -85,7 +82,7 @@ function STENCIL_CORE:StencilDelete(chip_proxy, index)
 			stencils[chip_proxy] = nil
 			
 			--unregister the EntityProxy of the chip (do this, or get memory leaks!)
-			entity_proxy.Destroy("StencilCore", chip_proxy)
+			chip_proxy:Destroy()
 		end
 	end
 end

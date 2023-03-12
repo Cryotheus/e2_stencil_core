@@ -8,7 +8,7 @@ local config = {
 	},
 	
 	{
-		duplex = "server",
+		duplex = "shared",
 		
 		convar = {
 			client = true,

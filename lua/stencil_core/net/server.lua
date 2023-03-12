@@ -37,14 +37,10 @@ function STENCIL_CORE:NetQueueStencil(stencil, behavior)
 end
 
 function STENCIL_CORE:NetQueueStencilInternal(stencil, behavior, queued_stencils, no_hook)
-	--behavior
-	--	true: send all the stencil data
-	--	false: send the delete message
-	--	nil: send the entities and parameter changes
-	local queued_count = #queued_stencils
+	local queue_length = #queued_stencils
 	
-	if behavior == false then --delete stencil on client
-		for index = queued_count, 1, -1 do
+	if behavior == false then
+		for index = queue_length, 1, -1 do
 			local queued_stencil = queued_stencils[index]
 			
 			if stencil_equal(queued_stencil, stencil) then
@@ -58,25 +54,42 @@ function STENCIL_CORE:NetQueueStencilInternal(stencil, behavior, queued_stencils
 			Index = stencil.Index,
 			NetRemove = true,
 		})
-	else --create or update stencil on client
-		--check if we already have the message queued, or if we need to queue it
-		for index = queued_count, 1, -1 do
-			local queued_stencil = queued_stencils[index]
+	else
+		if behavior then
+			--behavior = true means to tell the client they need to create the stencil
+			stencil.NetCreate = true
 			
-			if stencil_equal(queued_stencil, stencil) then
-				if queued_stencil.NetRemove then break
-				else return end
+			for index = queue_length, 1, -1 do
+				local queued_stencil = queued_stencils[index]
+				
+				if stencil_equal(queued_stencil, stencil) then
+					if queued_stencil.NetRemove then break --we're deleting it, queue for creation
+					elseif queued_stencil == stencil then return --it's already queued, we're good
+					else error("this should never happen! a stencil attempted to queue when an equivalent stencil was already queued with a difference reference") end
+				end
+			end
+		else
+			for index = queue_length, 1, -1 do
+				local queued_stencil = queued_stencils[index]
+				
+				if stencil_equal(queued_stencil, stencil) then
+					if queued_stencil.NetRemove or queued_stencil == stencil then return
+					else error("this should never happen! a stencil attempted to queue when an equivalent stencil was already queued with a difference reference") end
+				end
 			end
 		end
-		
-		--tells the client to create the stencil
-		if behavior then stencil.NetCreate = true end
 		
 		table.insert(queued_stencils, stencil)
 	end
 	
 	if no_hook then return end
-	if queued_count == 0 then hook.Add("Think", "StencilCoreNet", function() if self:NetThink(queued_stencils) then hook.Remove("Think", "StencilCoreNet") end end) end
+	
+	if queue_length == 0 then
+		hook.Add("Think", "StencilCoreNet", function()
+			--remove the hook if we're done
+			if self:NetThink(queued_stencils) then hook.Remove("Think", "StencilCoreNet") end
+		end)
+	end
 end
 
 function STENCIL_CORE:NetThink(queued_stencils, target)
@@ -85,19 +98,20 @@ function STENCIL_CORE:NetThink(queued_stencils, target)
 	
 	--TODO: set the NetSent field to true on the stencil once sent
 	local completed = 0
-	local passed = false
+	local queue_length = #queued_stencils
 	
 	net.Start("StencilCore")
 	
 	for index, queued_stencil in ipairs(queued_stencils) do
 		if net.BytesWritten() >= stop_net_message_at then break end
-		if passed then net.WriteBool(true)
-		else passed = true end
 		
+		net.WriteBool(true)
 		self:NetWriteStencilIdentifier(queued_stencil)
 		
 		if queued_stencil.NetRemove then net.WriteBool(true)
 		else
+			net.WriteBool(false)
+			
 			queued_stencil.NetSent = true
 			
 			if queued_stencil.NetCreate then
@@ -194,6 +208,7 @@ function STENCIL_CORE:NetThink(queued_stencils, target)
 		end
 		
 		completed = completed + 1
+		queued_stencils[index] = nil
 	end
 	
 	net.WriteBool(false)
@@ -203,19 +218,16 @@ function STENCIL_CORE:NetThink(queued_stencils, target)
 	else
 		local filter = RecipientFilter()
 		
-		for ply in ipairs(loaded_players) do filter:AddPlayer(ply) end
+		for index, ply in ipairs(loaded_players) do filter:AddPlayer(ply) end
 		
 		net.Send(filter)
 	end
 	
 	--faster dequeue
-	for index = completed + 1, #queued_stencils do
-		queued_stencils[index - completed] = queued_stencils[index]
-		queued_stencils[index] = nil
-	end
+	for index = completed + 1, queue_length do queued_stencils[index - completed] = queued_stencils[index] end
 	
 	--if we have more to sync, keep the hook alive
-	if queued_stencils[1] then return end
+	if queued_stencils[1] then return false end
 	
 	return true
 end
@@ -224,7 +236,6 @@ function STENCIL_CORE:NetWriteStencilData(stencil)
 	--POST: write stencil parameters
 	net.WriteEntity(stencil.Owner)
 	net.WriteUInt(self.Hooks[stencil.Hook] - 1, bits_hooks)
-	net.WriteBool(stencil.Prefab and true or false)
 	
 	if stencil.Prefab then
 		net.WriteBool(true)
@@ -235,14 +246,8 @@ function STENCIL_CORE:NetWriteStencilData(stencil)
 	end 
 end
 
-
-
-
-
 function STENCIL_CORE:NetWriteStencilIdentifier(stencil)
-	print("stencil")
-	PrintTable(stencil)
-	
+	print("NetWriteStencilIdentifier", stencil.Chip, stencil.Index, stencil)
 	entity_proxy.Write(stencil.ChipIndex)
 	net.WriteUInt(stencil.Index, bits_maximum_stencil_index)
 end

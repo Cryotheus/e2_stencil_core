@@ -1,6 +1,5 @@
 --locals
 local developer = GetConVar("developer")
-local is_entity_proxy_alive = entity_proxy.IsAlive
 local operations = STENCIL_CORE.Operations
 local parameterized_operations = STENCIL_CORE.ParameterizedOperations
 local render_SetColorModulation = render.SetColorModulation
@@ -20,7 +19,7 @@ local deserialize_functions = {
 	table = function(value) return "Color(" .. value.r .. ", " .. value.g .. ", " .. value.b .. ", " .. value.a .. ")" end,
 }
 
-local required_header_operations = {
+local required_header_operations_static = {
 	clear_stencil = true,
 	enabled = true,
 	set_compare = STENCIL_ALWAYS,
@@ -39,6 +38,13 @@ local write_operations = {
 }
 
 --local functions
+local function name_source(stencil)
+	local ply = stencil.Owner
+	
+	if ply:IsValid() then return "stencil_core[" .. stencil.ChipIndex .. "(" .. tostring(ply:EntIndex()) .. "/" .. ply:UserID() .. ")-" .. stencil.Index .. "]"
+	else return "stencil_core[" .. stencil.ChipIndex .. "(unknown)-" .. stencil.Index .. "]" end
+end
+
 local function serialize_value(value) return deserialize_functions[type(value)](value) end
 
 --stencil functions
@@ -51,7 +57,7 @@ function STENCIL_CORE:CompileStencil(stencil)
 	local instructions_count = #instructions
 	local parameter_line = ""
 	local parameterized_instructions = table.Copy(stencil.ParameterizedIndices)
-	local required_header_operations = table.Copy(required_header_operations)
+	local required_header_operations = table.Copy(required_header_operations_static)
 	local trimming --1 more than the index of the last operation that writes to the stencil
 	local while_index = 1
 	
@@ -59,8 +65,8 @@ function STENCIL_CORE:CompileStencil(stencil)
 	while while_index <= instructions_count do --you can't adjust the end of a for loop while it's running :(
 		local instruction = instructions[while_index]
 		local operation = instruction[1]
-		local operation_code = operations[instruction[1]]
-		local value = instruction[2]
+		--local operation_code = operations[instruction[1]]
+		--local value = instruction[2]
 		
 		if in_header then
 			if write_operations[operation] then
@@ -149,7 +155,7 @@ function STENCIL_CORE:CompileStencil(stencil)
 	
 	--put the header and code body together
 	code = code_header .. "\nreturn function(" .. parameter_line .. ")" .. code .. "\nend"
-	local compiled_code = CompileString(code, "stencil_core[stencil_" .. tostring(stencil) .. "]")
+	local compiled_code = CompileString(code, name_source(stencil))
 	local render_function = compiled_code()
 	
 	if developer:GetInt() >= 2 then MsgC(color_white, code, "\n") end

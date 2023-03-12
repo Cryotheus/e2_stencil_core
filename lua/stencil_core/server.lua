@@ -48,7 +48,7 @@ function STENCIL_CORE:StencilEntityChanged(proxy, stencil, layer_index, added)
 	
 	if not entity_layer_changes then
 		entity_layer_changes = {}
-		entity_layers_changes[layer_index] = entity_layers_changes
+		entity_layers_changes[layer_index] = entity_layer_changes
 	end
 	
 	set_entity_change(entity_layer_changes, proxy, added)
