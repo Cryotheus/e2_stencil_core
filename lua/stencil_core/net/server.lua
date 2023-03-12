@@ -1,227 +1,277 @@
---include("includes/entity_proxy.lua")
-util.AddNetworkString("stencil_core")
+include("includes/entity_proxy.lua")
+util.AddNetworkString("StencilCore")
 
 --locals
-local loaded_players = STENCIL_CORE.LoadedPlayers
+local loaded_players = STENCIL_CORE.LoadedPlayers --duplex!
 local loading_players = STENCIL_CORE.LoadingPlayers
-local network_think_methods = {"NetWriteStencils", "NetWriteStencilsEntities"}
-local maximum_net_size = 60000 --just shy of 64KB, the maximum size of a net message
+local player_queued_stencils = {}
+local queued_stencils = {}
+
+--lower = more biased to a full sync where 0 is always a full sync and math.huge is always a change sync
+--POST: convar me maybe? (full_entity_sync_bias)
+local full_entity_sync_bias = 0.9
+local stop_net_message_at = 60000 --roughly 58.5kb
 
 --local functions
 local function bits(decimal) return math.ceil(math.log(decimal, 2)) end
+local function stencil_equal(first, second) return first == second or (first.ChipID == second.ChipID and first.Index == second.Index) end
 
 --post function setup
+local bits_hooks = bits(#STENCIL_CORE.Hooks)
 local bits_layer_entities
 local bits_layers
 local bits_maximum_stencil_index
-local bits_parameters = 0
+--local bits_parameters = 0
 local bits_prefabs = bits(#STENCIL_CORE.Prefabs)
 
---globals
-STENCIL_CORE.NetHookBits = bits(#STENCIL_CORE.Hooks)
-
 --stencil core functions
-function STENCIL_CORE:NetPlayerLoad(ply)
-	if loading_players[ply] then
-		loaded_players[ply] = true
-		loading_players[ply] = nil
-		
-		STENCIL_CORE:NetSendStencils(ply)
+function STENCIL_CORE:NetQueueStencil(stencil, behavior)
+	if next(loaded_players) then self:NetQueueStencilInternal(stencil, behavior, queued_stencils) end
+	
+	if next(loading_players) then
+		for ply, status in pairs(loading_players) do
+			--queue up more for players who have started the initial sync
+			if not status then self:NetQueueStencilInternal(stencil, behavior, player_queued_stencils[ply], true) end
+		end
 	end
 end
 
-function STENCIL_CORE:NetQueueStencil(stencil, method, deletion)
-	--method is a number representing what we are sending
-	--1: stencil data
-	--2: stencil entities
-	local chip = stencil.Chip
-	local identifier = "StencilCoreNet" .. method
-	local index = stencil.Index
-	local queue = method == 1 and self.NetStencilQueue or self.NetStencilEntitiesQueue
+function STENCIL_CORE:NetQueueStencilInternal(stencil, behavior, queued_stencils, no_hook)
+	--behavior
+	--	true: send all the stencil data
+	--	false: send the delete message
+	--	nil: send the entities and parameter changes
+	local queued_count = #queued_stencils
 	
-	if deletion then --delete stencil on client
-		for index = #queue, 1, -1 do
-			local queued_stencil = queue[index]
+	if behavior == false then --delete stencil on client
+		for index = queued_count, 1, -1 do
+			local queued_stencil = queued_stencils[index]
 			
-			if queued_stencil.Chip == chip and queued_stencil.Index == index then
-				--don't make another delete stencil if there's already one queued
-				if queued_stencil.Delete then return end
-				
-				--remove any other stencil updates from the queue
-				table.remove(queue, index)
+			if stencil_equal(queued_stencil, stencil) then
+				if queued_stencil.NetRemove then return
+				else table.remove(queued_stencils, index) end
 			end
 		end
 		
-		--a discounted stencil for the sole purpose of deleting the client-side copy
-		table.insert(queue, {
-			Chip = chip,
-			ChipIndex = stencil.ChipIndex,
-			Delete = true,
-			Index = index,
+		table.insert(queued_stencils, {
+			ChipID = stencil.ChipID,
+			Index = stencil.Index,
+			NetRemove = true,
 		})
-	else --update stencil on client
-		for index, queued_stencil in ipairs(queue) do
-			--this works with stencils that have the exact same chip and stencil index
-			--this is due to the fact that tables use a different reference when we create a new stencil
-			if queued_stencil == stencil then return end
+	else --create or update stencil on client
+		--check if we already have the message queued, or if we need to queue it
+		for index = queued_count, 1, -1 do
+			local queued_stencil = queued_stencils[index]
+			
+			if stencil_equal(queued_stencil, stencil) then
+				if queued_stencil.NetRemove then break
+				else return end
+			end
 		end
 		
-		table.insert(queue, stencil)
+		--tells the client to create the stencil
+		if behavior then stencil.NetCreate = true end
+		
+		table.insert(queued_stencils, stencil)
 	end
 	
-	--start running the queue
-	if queue[2] then return end
-	
-	hook.Add("Think", identifier, function() if self:NetThink(queue, method) then hook.Remove("Think", identifier) end end)
+	if no_hook then return end
+	if queued_count == 0 then hook.Add("Think", "StencilCoreNet", function() if self:NetThink(queued_stencils) then hook.Remove("Think", "StencilCoreNet") end end) end
 end
 
-function STENCIL_CORE:NetSendStencils(ply)
-	local player_index = ply:EntIndex()
-	local identifier_1 = "StencilCoreNet1_" .. player_index
-	local identifier_2 = "StencilCoreNet2_" .. player_index
-	local queue = {}
+function STENCIL_CORE:NetThink(queued_stencils, target)
+	--if something changed and we're still hooked, destroy the hook
+	if not queued_stencils[1] then return true end
 	
-	for chip, chip_stencils in pairs(self.Stencils) do
-		--POST: optimize me!
-		for index, stencil in pairs(chip_stencils) do
-			if stencil.Sent then table.insert(queue, stencil) end
+	--TODO: set the NetSent field to true on the stencil once sent
+	local completed = 0
+	local passed = false
+	
+	net.Start("StencilCore")
+	
+	for index, queued_stencil in ipairs(queued_stencils) do
+		if net.BytesWritten() >= stop_net_message_at then break end
+		if passed then net.WriteBool(true)
+		else passed = true end
+		
+		self:NetWriteStencilIdentifier(queued_stencil)
+		
+		if queued_stencil.NetRemove then net.WriteBool(true)
+		else
+			queued_stencil.NetSent = true
+			
+			if queued_stencil.NetCreate then
+				net.WriteBool(true)
+				self:NetWriteStencilData(queued_stencil)
+			else net.WriteBool(false) end
+			
+			--POST: write parameters
+			
+			local entity_changes = 0
+			local entity_layers = stencil.EntityLayers
+			local entity_layers_changes = stencil.EntityChanges
+			local entities_added = {}
+			local entities_removed = {}
+			local total_entity_count = stencil.EntityCount
+			
+			--first we need to count the changes (and prepare the lists)
+			for layer_index, entity_layer in pairs(entity_layers) do
+				local entity_layer_changes = entity_layers_changes[layer_index]
+				
+				if entity_layer_changes then
+					local added_count = 0
+					local entities_added_layer = {}
+					local entities_removed_layer = {}
+					local removed_count = 0
+					
+					for entity_proxy, added in pairs(entity_layer_changes) do
+						if added then
+							added_count = added_count + 1
+							
+							table.insert(entities_added_layer, entity_proxy)
+						else
+							removed_count = removed_count + 1
+							
+							table.insert(entities_removed_layer, entity_proxy)
+						end
+					end
+					
+					entities_added_layer.Count, entities_removed_layer.Count = added_count, removed_count
+					entities_added[layer_index], entities_removed[layer_index] = entities_added_layer, entities_removed_layer
+					entity_changes = entity_changes + added_count + removed_count
+				end
+			end
+			
+			--the we do the actual writing
+			if entity_changes < total_entity_count * full_entity_sync_bias then 
+				net.WriteBool(true) --true: syncing with changes
+				
+				for layer_index, entity_layer in pairs(entity_layers) do
+					local entities_added_layer = entities_added[layer_index]
+					local entities_removed_layer = entities_removed[layer_index]
+					
+					if entities_added_layer and entities_removed_layer then
+						net.WriteBool(true)
+						net.WriteUInt(layer_index - 1, bits_layers)
+						net.WriteUInt(entities_added_layer.Count, bits_layer_entities)
+						
+						for index, proxy in ipairs(entities_added_layer) do entity_proxy.Write(proxy) end
+						
+						net.WriteUInt(entities_removed_layer.Count, bits_layer_entities)
+						
+						for index, proxy in ipairs(entities_removed_layer) do
+							entity_proxy.Write(proxy)
+							
+							--we still need to make sure the proxy gets removed, so decrement the reference count
+							proxy:DecrementEntityProxyReferenceCount()
+						end
+					else entity_layers[layer_index] = nil end
+				end
+				
+				--list ends here
+				net.WriteBool(false)
+			else --then we sync using changes if it will roughly write less to the net message
+				net.WriteBool(false) --false: full sync
+				
+				--write entities
+				for layer_index, entity_layer in pairs(entity_layers) do
+					net.WriteBool(true)
+					net.WriteUInt(layer_index - 1, bits_layers)
+					net.WriteUInt(entity_layer.Count, bits_layer_entities)
+					
+					for index, proxy in ipairs(entity_layer) do entity_proxy.Write(proxy) end
+				end
+				
+				--list ends here
+				net.WriteBool(false)
+				
+				--garbage collection
+				for layer_index, entity_layer in pairs(entities_removed) do
+					--we still need to make sure the proxy gets removed, so decrement the reference count
+					for index, proxy in ipairs(entity_layer) do proxy:DecrementEntityProxyReferenceCount() end
+				end
+			end
 		end
+		
+		completed = completed + 1
 	end
 	
-	--don't make an empty queue
-	if not queue[1] then return end
-	
-	hook.Add("Think", identifier_1, function() if self:NetThink(queue, 1, ply) then hook.Remove("Think", identifier_1) end end)
-	hook.Add("Think", identifier_2, function() if self:NetThink(queue, 2, ply) then hook.Remove("Think", identifier_2) end end)
-end
-
-function STENCIL_CORE:NetThink(queue, method, recipient)
-	net.Start("stencil_core")
-	net.WriteUInt(method - 1, 1)
-	
-	--how to confuse glua noobs, this:
-	local completed = self[network_think_methods[method]](self, queue, not recipient)
-	
-	--tell the client there is no more to read
 	net.WriteBool(false)
 	
-	if recipient then net.Send(recipient)
-	else --send to players who 
-		recipient = RecipientFilter()
+	--send the net message to the target or to all loaded players
+	if target then net.Send(target)
+	else
+		local filter = RecipientFilter()
 		
-		for index, ply in ipairs(player.GetHumans()) do if loaded_players[ply] then recipient:AddPlayer(ply) end end
+		for ply in ipairs(loaded_players) do filter:AddPlayer(ply) end
 		
-		net.Send(recipient)
+		net.Send(filter)
 	end
 	
-	--simulatanously remove the completed stencils from the queue and shift the remaining stencils to the front of the queue
-	for index = completed + 1, #queue do queue[index - completed], queue[index] = queue[index], nil end
+	--faster dequeue
+	for index = completed + 1, #queued_stencils do
+		queued_stencils[index - completed] = queued_stencils[index]
+		queued_stencils[index] = nil
+	end
 	
-	--return true if we are done
-	return not queue[1]
-end
-
-function STENCIL_CORE:NetWriteEntityLayer(layer)
-	net.WriteUInt(#layer, bits_layer_entities)
+	--if we have more to sync, keep the hook alive
+	if queued_stencils[1] then return end
 	
-	for index, entity in ipairs(layer) do entity_proxy.Write(entity) end
+	return true
 end
-
-function STENCIL_CORE:NetWriteInstructions(stencil) end --POST: implement me!
-function STENCIL_CORE:NetWriteParameters(parameters) end --POST: implement me!
 
 function STENCIL_CORE:NetWriteStencilData(stencil)
+	--POST: write stencil parameters
 	net.WriteEntity(stencil.Owner)
-	self:NetWriteParameters(stencil.Parameters)
-	net.WriteUInt(self.Hooks[stencil.Hook] - 1, self.NetHookBits)
+	net.WriteUInt(self.Hooks[stencil.Hook] - 1, bits_hooks)
 	net.WriteBool(stencil.Prefab and true or false)
 	
-	if stencil.Prefab then net.WriteUInt(stencil.Prefab - 1, bits_prefabs)
-	else error("unimplemented") end --POST: implement me!
+	if stencil.Prefab then
+		net.WriteBool(true)
+		net.WriteUInt(stencil.Prefab - 1, bits_prefabs)
+	else
+		--POST: write stencil instructions
+		net.WriteBool(false)
+	end 
 end
 
 function STENCIL_CORE:NetWriteStencilIdentifier(stencil)
-	net.WriteUInt(stencil.Index, bits_maximum_stencil_index)
 	entity_proxy.Write(stencil.ChipIndex)
+	net.WriteUInt(stencil.Index, bits_maximum_stencil_index)
 end
 
-function STENCIL_CORE:NetWriteStencils(queue, broadcast)
-	local completed = 0
-	local passed = false
-	
-	for index, stencil in ipairs(queue) do
-		if net.BytesWritten() > maximum_net_size then break end
-		
-		--we only write a true if there's more for the client to read
-		if passed then net.WriteBool(true)
-		else passed = true end
-		
-		self:NetWriteStencilIdentifier(stencil)
-		
-		if stencil.Delete then net.WriteBool(true)
-		else
-			net.WriteBool(false) --don't delete!
-			self:NetWriteStencilData(stencil)
-			
-			if broadcast then stencil.Sent = true end
-		end
-		
-		completed = index
-		queue[index] = nil
-	end
-	
-	return completed
-end
-
-function STENCIL_CORE:NetWriteStencilsEntities(queue)
-	local completed = 0
-	local passed = false
-	
-	for index, stencil in ipairs(queue) do
-		if net.BytesWritten() > maximum_net_size then break end
-		
-		--we only write a true if there's more for the client to read
-		if passed then net.WriteBool(true)
-		else passed = true end
-		
-		local entity_layers = stencil.EntityLayers
-		--[[local entity_layers_update = stencil.EntityLayersUpdate
-		
-		if entity_layers_update then
-			stencil.EntityLayersUpdate = nil
-			
-			if stencil.EntityCount <= stencil.EntityUpdateCount then entity_layers = entity_layers_update end
-		end]]
-		
-		self:NetWriteStencilIdentifier(stencil)
-		net.WriteUInt(table.Count(entity_layers), bits_layers)
-	
-		for index, entity_layer in pairs(entity_layers) do
-			net.WriteUInt(index - 1, bits_layers)
-			self:NetWriteEntityLayer(entity_layer)
-		end
-		
-		completed = index
-		queue[index] = nil
-	end
-	
-	return completed
-end
-
---hooks
+--hook
 hook.Add("PlayerDisconnected", "StencilCoreNet", function(ply)
-	local player_index = ply:EntIndex()
-	loaded_players[ply] = nil
+	local loaded_players_index = loaded_players[ply]
 	loading_players[ply] = nil
 	
-	hook.Remove("Think", "StencilCoreNet1_" .. player_index)
-	hook.Remove("Think", "StencilCoreNet2_" .. player_index)
+	if loaded_players_index then
+		loaded_players[loaded_players_index] = nil
+		loaded_players[ply] = nil
+	end
+	
+	hook.Remove("Think", "StencilCoreNet" .. ply:EntIndex())
 end)
 
 hook.Add("PlayerInitialSpawn", "StencilCoreNet", function(ply) loading_players[ply] = true end)
 
---net
-net.Receive("stencil_core", function(length, ply) STENCIL_CORE:NetPlayerLoad(ply) end)
+hook.Add("SetupMove", "StencilCoreNet", function(ply, _move, command)
+	if loading_players[ply] and not command:IsForced() then
+		local identifier = "StencilCoreNet" .. ply:EntIndex()
+		local queued_stencils = {}
+		loading_players[ply] = false
+		player_queued_stencils[ply] = queued_stencils
+		
+		hook.Add("Think", identifier, function()
+			if STENCIL_CORE:NetThink(queued_stencils, ply) then
+				loaded_players[ply] = table.insert(loaded_players, ply)
+				loading_players[ply] = nil
+				
+				hook.Remove("Think", identifier)
+			end
+		end)
+	end
+end)
 
 --post
 STENCIL_CORE:ConVarListen("layer_entities", "Net", function(convar) bits_layer_entities = bits(convar:GetInt()) end, true)

@@ -53,16 +53,16 @@ local operations = {
 }
 
 --[[
-operations that are inserted before draw operations if missing
-{"clear_stencil", true},
-{"enabled", true},
-{"set_compare", STENCIL_ALWAYS},
-{"set_fail_operation", STENCIL_KEEP},
-{"set_occluded_operation", STENCIL_KEEP},
-{"set_pass_operation", STENCIL_KEEP},
-{"set_reference_value", 1},
-{"set_test_mask", 255},
-{"set_write_mask", 255},
+	operations that are inserted before draw operations if missing
+	{"clear_stencil", true},
+	{"enabled", true},
+	{"set_compare", STENCIL_ALWAYS},
+	{"set_fail_operation", STENCIL_KEEP},
+	{"set_occluded_operation", STENCIL_KEEP},
+	{"set_pass_operation", STENCIL_KEEP},
+	{"set_reference_value", 1},
+	{"set_test_mask", 255},
+	{"set_write_mask", 255},
 ]]
 
 local prefabs = {
@@ -265,3 +265,6 @@ STENCIL_CORE = STENCIL_CORE or {
 	Stencils = {},
 	Version = "0.1.0",
 }
+
+--post
+entity_proxy.Register("StencilCore")

@@ -45,12 +45,11 @@ function STENCIL_CORE:RestoreEntityRender(entity)
 	end
 end
 
-function STENCIL_CORE:StencilCreate(chip, index, chip_index)
-	local chip_index = chip_index or chip:EntIndex()
+function STENCIL_CORE:StencilCreate(chip, index)
 	local chip_stencils = stencils[chip]
 	local stencil = {
 		Chip = chip,
-		ChipIndex = chip_index, --null entity safety
+		ChipIndex = chip:EntIndex(), --null entity safety
 		EntityLayers = {},
 		Hook = nil, --size hint
 		Index = index,
@@ -64,16 +63,7 @@ function STENCIL_CORE:StencilCreate(chip, index, chip_index)
 		chip_stencils = {[index] = stencil}
 		stencils[chip] = chip_stencils
 		
-		chip:CallOnRemove("StencilCore", function()
-			timer.Simple(0, function()
-				if chip:IsValid() then return end
-				
-				stencils[chip] = nil
-				
-				--unregister the EntityProxy of the chip (do this, or get memory leaks!)
-				entity_proxy.Destroy(stencil.ChipIndex)
-			end)
-		end)
+		function chip:OnProxiedEntityRemove() stencils[chip] = nil end
 		
 		--we want manual control over when the EntityProxy is unregistered
 		chip:SetAutoRemoveEntityProxy(false)
@@ -82,8 +72,8 @@ function STENCIL_CORE:StencilCreate(chip, index, chip_index)
 	return stencil
 end
 
-function STENCIL_CORE:StencilDelete(chip, index)
-	local chip_stencils = stencils[chip]
+function STENCIL_CORE:StencilDelete(chip_proxy, index)
+	local chip_stencils = stencils[chip_proxy]
 	
 	if chip_stencils then
 		local stencil = chip_stencils[index]
@@ -92,10 +82,10 @@ function STENCIL_CORE:StencilDelete(chip, index)
 		
 		--remove empty tables
 		if not next(chip_stencils) then
-			stencils[chip] = nil
+			stencils[chip_proxy] = nil
 			
 			--unregister the EntityProxy of the chip (do this, or get memory leaks!)
-			entity_proxy.Destroy(stencil.ChipIndex)
+			entity_proxy.Destroy("StencilCore", chip_proxy)
 		end
 	end
 end

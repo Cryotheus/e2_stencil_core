@@ -1,8 +1,9 @@
 --https://github.com/Cryotheus/cryotheums_loader
 local config = {
+	{includes = {entity_proxy = "shared"}}, --external include, addon dependency!
+	
 	{
 		global = "shared",
-		includes = {entity_proxy = "shared"}, --external include, not part of this addon!
 		loader = "download",
 	},
 	
@@ -36,7 +37,7 @@ local config = {
 local branding = "Stencil Core 2"
 local color = Color(227, 145, 240) --color representing your project
 local color_generic = Color(240, 240, 240) --most frequently used color
-local silent = false --disable console messages
+local silent = true --disable console messages
 
 do --do not touch
 	--locals

@@ -67,7 +67,7 @@ e2function void stencilAddEntity(number stencil_index, number layer_index, entit
 	if stencil_index and layer_index then
 		local stencil = stencil_repo[self.entity][stencil_index]
 		
-		if stencil and entity:IsValid() and authorized(self, entity) and STENCIL_CORE:StencilAddEntity(self, entity, stencil, layer_index) then return end
+		if stencil and entity:IsValid() and authorized(self, entity) and STENCIL_CORE:StencilAddEntity(entity, stencil, layer_index) then return end
 		
 		self:throw("Failed to add entity to stencil; it may already be added or you have hit the limit of entities the layer or stencil can hold.")
 	end
@@ -82,7 +82,7 @@ e2function void stencilAddEntity(number stencil_index, number layer_index, numbe
 		local hologram = get_hologram(self, hologram_index)
 		local stencil = stencil_repo[self.entity][stencil_index]
 		
-		if stencil and hologram and STENCIL_CORE:StencilAddEntity(self, hologram, stencil, layer_index) then return end
+		if stencil and hologram and STENCIL_CORE:StencilAddEntity(hologram, stencil, layer_index) then return end
 		
 		self:throw("Failed to add hologram to stencil; it may already be added or you have hit the limit of entities the layer or stencil can hold.")
 	end
@@ -192,7 +192,7 @@ e2function void stencilRemoveEntity(number stencil_index, entity entity)
 	if stencil_index then
 		local stencil = stencil_repo[self.entity][stencil_index]
 		
-		if stencil and entity:IsValid() then STENCIL_CORE:StencilRemoveEntity(self, entity, stencil) end
+		if stencil and entity:IsValid() then STENCIL_CORE:StencilRemoveEntity(entity, stencil) end
 
 		return self:throw("Invalid stencil or entity.")
 	end
@@ -208,7 +208,7 @@ e2function void stencilRemoveEntity(number stencil_index, number layer_index, en
 	if stencil_index and layer_index then
 		local stencil = stencil_repo[self.entity][stencil_index]
 		
-		if stencil and entity:IsValid() then return STENCIL_CORE:StencilRemoveEntity(self, entity, stencil, layer_index) end
+		if stencil and entity:IsValid() then return STENCIL_CORE:StencilRemoveEntity(entity, stencil, layer_index) end
 		
 		return self:throw("Invalid stencil or entity.")
 	end
@@ -224,7 +224,7 @@ e2function void stencilRemoveEntity(number stencil_index, number hologram_index)
 		local hologram = get_hologram(self, hologram_index)
 		local stencil = stencil_repo[self.entity][stencil_index]
 		
-		if stencil and IsValid(hologram) then return STENCIL_CORE:StencilRemoveEntity(self, hologram, stencil) end
+		if stencil and IsValid(hologram) then return STENCIL_CORE:StencilRemoveEntity(hologram, stencil) end
 		
 		return self:throw("Invalid stencil or hologram index.")
 	end
@@ -241,7 +241,7 @@ e2function void stencilRemoveEntity(number stencil_index, number layer_index, nu
 		local hologram = get_hologram(self, hologram_index)
 		local stencil = stencil_repo[self.entity][stencil_index]
 		
-		if stencil and IsValid(hologram) then return STENCIL_CORE:StencilRemoveEntity(self, hologram, stencil, layer_index) end
+		if stencil and IsValid(hologram) then return STENCIL_CORE:StencilRemoveEntity(hologram, stencil, layer_index) end
 		
 		return self:throw("Invalid stencil or hologram index.")
 	end

@@ -5,29 +5,53 @@ local maximum_entities
 local maximum_layer_entities
 local maximum_stencils
 
+--local function
+local function set_entity_change(entity_layer_changes, proxy, added)
+	local current = entity_layer_changes[proxy]
+	
+	if current == nil then entity_layer_changes[proxy] = added
+	elseif current ~= added then entity_layer_changes[proxy] = nil end
+end
+
 --stencil core functions
-function STENCIL_CORE:StencilAddEntity(chip_context, entity, stencil, layer_index)
+function STENCIL_CORE:StencilAddEntity(entity, stencil, layer_index)
+	local proxy = entity_proxy.Get("StencilCore", entity)
+	
 	if stencil.EntityCount >= maximum_entities then return end
 	
 	local entity_layers = stencil.EntityLayers
 	local entity_layer = entity_layers[layer_index]
-	local old_count
 	
 	--prevent duplicate counting
 	if entity_layer then
-		if entity_layer[entity] then return end
+		if entity_layer[proxy] then return end
 		if entity_layer.Count >= maximum_layer_entities then return end
 	else
-		entity_layer = {entity, [entity] = 1, Count = 0}
+		entity_layer = {proxy, [proxy] = 1, Count = 0}
 		entity_layers[layer_index] = entity_layer
 	end
 	
-	duplex_insert(entity_layer, entity)
-	entity:CallOnRemove("StencilCore", function(entity) STENCIL_CORE:StencilRemoveEntity(chip_context, entity, stencil) end)
-	self:NetQueueStencil(stencil, 2)
+	duplex_insert(entity_layer, proxy)
+	proxy:IncrementEntityProxyReferenceCount() --we decrement in net/server.lua
+	self:NetQueueStencil(stencil)
 	self:StencilCountEntity(stencil, entity_layer, 1)
+	self:StencilEntityChanged(proxy, stencil, layer_index, true)
+	
+	function proxy:OnProxiedEntityRemove() STENCIL_CORE:StencilRemoveEntity(self, stencil) end
 	
 	return true
+end
+
+function STENCIL_CORE:StencilEntityChanged(proxy, stencil, layer_index, added)
+	local entity_layers_changes = stencil.EntityChanges
+	local entity_layer_changes = entity_layers_changes[layer_index]
+	
+	if not entity_layer_changes then
+		entity_layer_changes = {}
+		entity_layers_changes[layer_index] = entity_layers_changes
+	end
+	
+	set_entity_change(entity_layer_changes, proxy, added)
 end
 
 function STENCIL_CORE:StencilCountEntity(stencil, entity_layer, count)
@@ -50,6 +74,7 @@ function STENCIL_CORE:StencilCreate(chip_context, index, nil_instructions)
 		ChipIndex = chip:EntIndex(),
 		Enabled = false,
 		EntityCount = 0,
+		EntityChanges = {},
 		EntityLayers = {},
 		Hook = "PreDrawTranslucentRenderables",
 		Index = index,
@@ -83,12 +108,16 @@ function STENCIL_CORE:StencilCreatePrefabricated(chip_context, index, prefab_ind
 end
 
 function STENCIL_CORE:StencilDelete(chip, index)
-	if self.Stencils[chip][index] then
+	local chip_stencils = self.Stencils[chip]
+	local stencil = chip_stencils[index]
+	
+	if stencil then
 		local ply = chip.context.player
-		self.Stencils[chip][index] = nil
+		chip_stencils[index] = nil
+		stencil.Removed = true
 		self.StencilCounter[ply] = self.StencilCounter[ply] - 1
 		
-		self:NetQueueStencil(stencil, 1, true)
+		self:NetQueueStencil(stencil, false)
 	end
 end
 
@@ -97,11 +126,11 @@ function STENCIL_CORE:StencilEnable(stencil, enable)
 	
 	stencil.Enabled = enable
 	
-	if enable then self:NetQueueStencil(stencil, 1)
+	if enable then self:NetQueueStencil(stencil, true)
 	else
-		stencil.Sent = false
+		stencil.NetSent = false
 		
-		self:NetQueueStencil(stencil, 1, true)
+		self:NetQueueStencil(stencil, false)
 	end
 end
 
@@ -114,23 +143,29 @@ function STENCIL_CORE:StencilPurge(chip_context) --POST: we can optimize this
 		count = count + 1
 		stencils[index] = nil
 		
-		self:NetQueueStencil(stencil, 1, true)
+		self:NetQueueStencil(stencil, false)
 	end
 	
 	self.StencilCounter[ply] = self.StencilCounter[ply] - count
 end
 
-function STENCIL_CORE:StencilRemoveEntity(self, entity, stencil, layer_index)
+function STENCIL_CORE:StencilRemoveEntity(entity, stencil, layer_index)
+	local entity = entity_proxy.Get("StencilCore", entity)
 	local entity_layers = stencil.EntityLayers
+	local entity_layers_changes = stencil.EntityChanges
 	
 	if layer_index then
 		local entity_layer = entity_layers[layer_index]
+		local entity_layer_changes = entity_layers_changes[layer_index]
 		
 		if entity_layer[entity] then
 			duplex_remove(entity_layer, entity)
-			entity:RemoveCallOnRemove("StencilCore")
-			self:NetQueueStencil(stencil, 2)
+			self:NetQueueStencil(stencil)
 			self:StencilCountEntity(stencil, entity_layer, -1)
+			self:StencilEntityChanged(entity, stencil, layer_index, false)
+			
+			if entity_layer_changes[entity] then entity_layer_changes[entity] = nil
+			else entity_layer_changes[entity] = false end
 		end
 		
 		return
