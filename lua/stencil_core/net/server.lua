@@ -2,6 +2,7 @@ include("includes/entity_proxy.lua")
 util.AddNetworkString("StencilCore")
 
 --locals
+local await_load = {} --prevents a really complicated bug with duplicate networking
 local duplex_insert = STENCIL_CORE._DuplexInsert
 local duplex_remove = STENCIL_CORE._DuplexRemove
 local loaded_players = STENCIL_CORE.LoadedPlayers --duplex!
@@ -25,6 +26,17 @@ local bits_layers
 local bits_maximum_stencil_index
 --local bits_parameters = 0
 local bits_prefabs = bits(#STENCIL_CORE.Prefabs)
+
+--local functions
+function player_attempt_load(ply) --delay the load until the server is no longer broadcasting updates (prevents duplicate networking)
+	if queued_stencils[1] then return end
+	
+	await_load[ply] = nil
+	player_queued_stencils[ply] = nil
+		
+	duplex_insert(loaded_players, ply)
+	hook.Remove("Think", "StencilCoreNet" .. ply:EntIndex())
+end
 
 --stencil core functions
 function STENCIL_CORE:NetQueueStencil(stencil, behavior)
@@ -98,7 +110,11 @@ end
 
 function STENCIL_CORE:NetThink(queued_stencils, target)
 	--if something changed and we're still hooked, destroy the hook
-	if not queued_stencils[1] then return true end
+	if not queued_stencils[1] then
+		if target then player_attempt_load(target) end
+		
+		return true
+	end
 	
 	local allow_writing = not target --POST: optimize targetted messages
 	local completed = 0
@@ -253,6 +269,7 @@ function STENCIL_CORE:NetThink(queued_stencils, target)
 	
 	--if we have more to sync, keep the hook alive
 	if queued_stencils[1] then return false end
+	if target then player_attempt_load(target) end
 	
 	return true
 end
@@ -278,6 +295,7 @@ end
 
 --hook
 hook.Add("PlayerDisconnected", "StencilCoreNet", function(ply)
+	await_load[ply] = nil
 	loading_players[ply] = nil
 	
 	if loaded_players[ply] then duplex_remove(loaded_players, ply) end
@@ -302,11 +320,8 @@ hook.Add("SetupMove", "StencilCoreNet", function(ply, _move, command)
 		
 		hook.Add("Think", identifier, function()
 			if STENCIL_CORE:NetThink(queued_stencils, ply, true) then
+				await_load[ply] = true
 				loading_players[ply] = nil
-				player_queued_stencils[ply] = nil
-				
-				duplex_insert(loaded_players, ply)
-				hook.Remove("Think", identifier)
 			end
 		end)
 	end
